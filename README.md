@@ -173,60 +173,66 @@ ImageControlHelper.AddPaintElements(imageControl, circle, line);
 - **滚轮缩放**：鼠标滚轮上下滚动，以鼠标位置为中心缩放
 - **拖拽平移**：按住鼠标左键拖动图像
 - **双击复位**：双击图像恢复到默认缩放比例
-- **左键单击**：在图像上单击鼠标左键，触发 `ImageClick` 事件（用于控制机械手移动）
+- **左键单击**：在图像上单击鼠标左键，触发 `ImageClick` 事件（供外部调用方订阅，用于控制机械手移动）
 
 禁用滚轮缩放：
 ```csharp
 imageControl.AllowMouseScroll = false;
 ```
 
-### 使用鼠标单击控制机械手
+### 鼠标左键单击事件（供外部调用方使用）
 
-控件提供了 `ImageClick` 事件，当用户在图像上单击鼠标左键时触发。事件参数包含：
-- `ControlPosition`：鼠标在控件中的位置（控件坐标）
-- `ImagePosition`：鼠标在图像中的位置（图像原始像素坐标）
+控件提供了 `ImageClick` 事件，供**外部调用方**订阅并处理。当用户在图像上单击鼠标左键时，会触发此事件，调用方可以在事件处理中实现自己的机械手控制逻辑。
 
-**基本使用**：
+**事件参数 `ImageClickEventArgs`**：
+- `ControlPosition`：鼠标在控件中的位置（控件坐标，`Point` 类型）
+- `ImagePosition`：鼠标在图像中的位置（图像原始像素坐标，`Point` 类型）
+
+**基本使用示例**：
 
 ```csharp
-// 订阅单击事件
+// 在您的项目中订阅单击事件
 imageControl.ImageClick += (sender, e) =>
 {
     // e.ImagePosition 是图像中的像素坐标
-    Console.WriteLine($"点击位置 - 图像坐标: X={e.ImagePosition.X:F2}, Y={e.ImagePosition.Y:F2}");
+    Point imagePos = e.ImagePosition;
+    Console.WriteLine($"点击位置 - 图像坐标: X={imagePos.X:F2}, Y={imagePos.Y:F2}");
     
-    // 将图像坐标转换为机械坐标（绝对坐标，单位：mm）
-    Point machinePos = imageControl.ConvertImageToMachinePosition(e.ImagePosition);
-    Console.WriteLine($"机械坐标: X={machinePos.X:F2}mm, Y={machinePos.Y:F2}mm");
+    // 可选：将图像坐标转换为机械坐标（需要先设置相机标定）
+    // Point machinePos = imageControl.ConvertImageToMachinePosition(imagePos);
+    // Console.WriteLine($"机械坐标: X={machinePos.X:F2}mm, Y={machinePos.Y:F2}mm");
     
-    // 控制机械手移动到该位置
-    // MoveRobotTo(machinePos.X, machinePos.Y);
+    // 在这里实现您的机械手控制逻辑
+    // YourRobotController.MoveTo(machinePos.X, machinePos.Y);
 };
 ```
 
-**完整示例：点击图像控制机械手移动**：
+**完整示例：在您的项目中集成鼠标单击控制**：
 
 ```csharp
 using Avalonia;
 using AvaloniaVisionControl;
 
-public class RobotControlExample
+// 这是您的项目代码，不是本项目的代码
+public class YourMainWindow : Window
 {
     private CtlOnlyShowImage _imageControl;
+    private YourRobotController _robotController; // 您的机械手控制器
     
-    public void Initialize()
+    public YourMainWindow()
     {
-        // 1. 创建图像控件
-        _imageControl = new CtlOnlyShowImage(0);
+        InitializeComponent();
         
-        // 2. 设置相机标定（必须设置，才能正确转换坐标）
-        // 假设：1像素 = 0.1mm，图像尺寸 1024x768
+        // 1. 获取或创建图像控件
+        _imageControl = this.FindControl<CtlOnlyShowImage>("ImageControl");
+        
+        // 2. 设置相机标定（如果需要进行坐标转换）
         _imageControl.SetCameraCalib(new Point(0.1, 0.1), 1024, 768);
         
         // 3. 设置当前机械位置（视野中心对应的机械坐标）
         MotionMgr.Ins.UpdateMachPos(100.0, 200.0); // 单位：mm
         
-        // 4. 订阅单击事件
+        // 4. 订阅单击事件，实现您的机械手控制逻辑
         _imageControl.ImageClick += OnImageClick;
     }
     
@@ -235,34 +241,29 @@ public class RobotControlExample
         // 获取图像像素坐标
         Point imagePos = e.ImagePosition;
         
-        // 转换为机械坐标（绝对坐标）
+        // 转换为机械坐标（绝对坐标，单位：mm）
         Point machinePos = _imageControl.ConvertImageToMachinePosition(imagePos);
         
-        // 控制机械手移动到目标位置
-        MoveRobotToPosition(machinePos.X, machinePos.Y);
-    }
-    
-    private void MoveRobotToPosition(double x, double y)
-    {
-        // 这里实现您的机械手控制逻辑
-        // 例如：调用机械手控制 API
-        Console.WriteLine($"移动机械手到: X={x:F2}mm, Y={y:F2}mm");
+        // 调用您的机械手控制方法
+        _robotController.MoveTo(machinePos.X, machinePos.Y);
         
-        // 示例：更新机械位置（如果机械手移动成功）
-        // MotionMgr.Ins.UpdateMachPos(x, y);
+        // 如果机械手移动成功，更新机械位置（以便图元正确显示）
+        // MotionMgr.Ins.UpdateMachPos(machinePos.X, machinePos.Y);
     }
 }
 ```
 
-**注意事项**：
+**重要说明**：
 
-1. **必须设置相机标定**：在使用坐标转换功能前，必须先调用 `SetCameraCalib` 方法设置标定参数
-2. **更新机械位置**：当机械手实际移动后，应调用 `MotionMgr.Ins.UpdateMachPos` 更新当前机械位置，以便图元正确显示
-3. **坐标系统**：
+1. **这是给外部调用方使用的 API**：`ImageClick` 事件是提供给您的项目使用的，您需要在自己的项目中订阅此事件并实现机械手控制逻辑
+2. **坐标转换是可选的**：如果您的机械手控制不需要坐标转换，可以直接使用 `e.ImagePosition`（像素坐标）
+3. **必须设置相机标定**：如果需要进行坐标转换（调用 `ConvertImageToMachinePosition`），必须先调用 `SetCameraCalib` 方法设置标定参数
+4. **更新机械位置**：当机械手实际移动后，建议调用 `MotionMgr.Ins.UpdateMachPos` 更新当前机械位置，以便图元正确显示
+5. **坐标系统**：
    - 图像坐标原点在左上角（像素坐标）
    - 机械坐标原点由标定确定，通常视野中心对应当前机械位置
    - `ConvertImageToMachinePosition` 返回的是绝对机械坐标（单位：mm）
-4. **单击与拖拽**：系统会自动区分单击和拖拽操作，只有真正的单击（移动距离 < 5像素）才会触发事件
+6. **单击与拖拽**：系统会自动区分单击和拖拽操作，只有真正的单击（移动距离 < 5像素）才会触发事件
 
 ## ⚙️ 相机标定
 
