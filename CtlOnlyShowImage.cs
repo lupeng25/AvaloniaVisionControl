@@ -20,9 +20,11 @@ namespace AvaloniaVisionControl
         private const double ZoomStep = 0.3;
         private bool _isDragging;
         private Point _dragStartPoint;
+        private Point _pressStartPoint; // 按下时的初始位置，用于判断单击
         private Point _scrollImageLocation = new Point(0, 0);
         private int _lastImageHeight = 0;
         private int _lastImageWidth = 0;
+        private const double ClickThreshold = 5.0; // 单击判断阈值（像素）
 
         /// <summary>
         /// 是否允许鼠标滚轮缩放
@@ -33,6 +35,12 @@ namespace AvaloniaVisionControl
         /// 需要显示的相机 ID 列表
         /// </summary>
         public int[] NeedShowCam { get; set; }
+
+        /// <summary>
+        /// 鼠标左键单击事件
+        /// 当用户在图像上单击鼠标左键时触发，用于控制机械手移动
+        /// </summary>
+        public event EventHandler<ImageClickEventArgs> ImageClick;
 
         public CtlOnlyShowImage(params int[] camIndex)
         {
@@ -120,6 +128,7 @@ namespace AvaloniaVisionControl
 
                 _isDragging = true;
                 _dragStartPoint = mousePos;
+                _pressStartPoint = mousePos; // 保存按下时的初始位置
                 Cursor = new Cursor(StandardCursorType.Hand);
             }
         }
@@ -154,8 +163,42 @@ namespace AvaloniaVisionControl
             base.OnPointerReleased(e);
 
             var point = e.GetCurrentPoint(this);
-            if (!point.Properties.IsLeftButtonPressed)
+            if (point.Properties.PointerUpdateKind == PointerUpdateKind.LeftButtonReleased)
             {
+                var mousePos = e.GetPosition(this);
+                
+                // 检查是否是单击（不是拖拽）
+                if (_isDragging)
+                {
+                    // 使用按下时的初始位置计算总移动距离
+                    double dragDistance = Math.Sqrt(
+                        Math.Pow(mousePos.X - _pressStartPoint.X, 2) + 
+                        Math.Pow(mousePos.Y - _pressStartPoint.Y, 2)
+                    );
+                    
+                    // 如果移动距离小于阈值，认为是单击
+                    if (dragDistance < ClickThreshold)
+                    {
+                        var imageRect = GetImageRectangle();
+                        if (imageRect.Contains(mousePos) && _originImage != null)
+                        {
+                            // 计算鼠标在图像中的原始坐标
+                            double imageX = (mousePos.X - _scrollImageLocation.X) / _currentZoomFactor;
+                            double imageY = (mousePos.Y - _scrollImageLocation.Y) / _currentZoomFactor;
+                            
+                            // 确保坐标在图像范围内
+                            imageX = Math.Max(0, Math.Min(imageX, _originImage.PixelSize.Width));
+                            imageY = Math.Max(0, Math.Min(imageY, _originImage.PixelSize.Height));
+                            
+                            // 触发单击事件
+                            ImageClick?.Invoke(this, new ImageClickEventArgs(
+                                mousePos, 
+                                new Point(imageX, imageY)
+                            ));
+                        }
+                    }
+                }
+                
                 _isDragging = false;
                 Cursor = Cursor.Default;
             }

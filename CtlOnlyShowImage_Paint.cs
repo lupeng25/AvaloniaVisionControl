@@ -69,7 +69,7 @@ namespace AvaloniaVisionControl
                 );
 
                 // 判断点是否在可见区域内
-                if (type == PaintElementType.Line)
+                if (type == PaintElementType.Line || type == PaintElementType.Text)
                 {
                     IsInImageRect = true;
                 }
@@ -217,6 +217,41 @@ namespace AvaloniaVisionControl
         public void ReFresh()
         {
             InvalidateVisual();
+        }
+
+        /// <summary>
+        /// 将图像像素坐标转换为机械坐标（绝对坐标，单位：mm）
+        /// </summary>
+        /// <param name="imagePixelPosition">图像中的像素坐标</param>
+        /// <returns>机械坐标（绝对坐标，单位：mm）</returns>
+        public Point ConvertImageToMachinePosition(Point imagePixelPosition)
+        {
+            if (_originImage == null)
+                throw new InvalidOperationException("图像未加载，无法进行坐标转换");
+
+            // 计算图像中心（像素坐标）
+            double imageCenterX = _originImage.PixelSize.Width / 2.0;
+            double imageCenterY = _originImage.PixelSize.Height / 2.0;
+
+            // 将像素坐标转换为相对于图像中心的坐标
+            Point relativePixelPos = new Point(
+                imagePixelPosition.X - imageCenterX,
+                imagePixelPosition.Y - imageCenterY
+            );
+
+            // 计算逆变换矩阵（从像素到机械）
+            double[] pixToMMMatrix = CalculateInverseTransform(m_9MMToPixMatrix);
+
+            // 将像素坐标转换为相对于视野中心的机械坐标
+            Point relativeMachPos = TransformPoint(relativePixelPos, pixToMMMatrix);
+
+            // 加上当前机械位置，得到绝对机械坐标
+            Point absoluteMachPos = new Point(
+                relativeMachPos.X + MotionMgr.Ins.CurrMachPos.X,
+                relativeMachPos.Y + MotionMgr.Ins.CurrMachPos.Y
+            );
+
+            return absoluteMachPos;
         }
 
         /// <summary>
