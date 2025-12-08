@@ -258,7 +258,26 @@ namespace AvaloniaVisionControl
                 }
             }
         }
-
+        //修改处：
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="availableSize"></param>
+        /// <returns></returns>
+        protected override Size MeasureOverride(Size availableSize)
+        {
+            // 若有图片，返回图片尺寸；若无，返回默认尺寸（避免宽高为0）
+            if (_originImage != null)
+            {
+                // 按图片原始尺寸返回（或根据缩放比例计算）
+                return new Size(
+                    _originImage.PixelSize.Width * _currentZoomFactor,
+                    _originImage.PixelSize.Height * _currentZoomFactor
+                );
+            }
+            // 无图片时返回默认尺寸（避免布局异常）
+            return new Size(800, 450); // 可根据需求调整默认值
+        }
         private void DrawCheckerboardBackground(DrawingContext context, Rect area)
         {
             const int gridSize = 10;
@@ -319,6 +338,8 @@ namespace AvaloniaVisionControl
             
             // 释放资源
             _originImage?.Dispose();
+            //修改处：
+            _originImage = null;
         }
     }
 }
