@@ -1,0 +1,15 @@
+E:\code\AvaloniaVisionControl\bin\Debug\net9.0\AvaloniaVisionControl.deps.json
+E:\code\AvaloniaVisionControl\bin\Debug\net9.0\AvaloniaVisionControl.dll
+E:\code\AvaloniaVisionControl\bin\Debug\net9.0\AvaloniaVisionControl.pdb
+E:\code\AvaloniaVisionControl\bin\Debug\net9.0\AvaloniaVisionControl.xml
+E:\code\AvaloniaVisionControl\obj\Debug\net9.0\AvaloniaVisionControl.csproj.AssemblyReference.cache
+E:\code\AvaloniaVisionControl\obj\Debug\net9.0\Avalonia\Resources.Inputs.cache
+E:\code\AvaloniaVisionControl\obj\Debug\net9.0\AvaloniaVisionControl.GeneratedMSBuildEditorConfig.editorconfig
+E:\code\AvaloniaVisionControl\obj\Debug\net9.0\AvaloniaVisionControl.AssemblyInfoInputs.cache
+E:\code\AvaloniaVisionControl\obj\Debug\net9.0\AvaloniaVisionControl.AssemblyInfo.cs
+E:\code\AvaloniaVisionControl\obj\Debug\net9.0\AvaloniaVisionControl.csproj.CoreCompileInputs.cache
+E:\code\AvaloniaVisionControl\obj\Debug\net9.0\AvaloniaVisionControl.dll
+E:\code\AvaloniaVisionControl\obj\Debug\net9.0\refint\AvaloniaVisionControl.dll
+E:\code\AvaloniaVisionControl\obj\Debug\net9.0\AvaloniaVisionControl.xml
+E:\code\AvaloniaVisionControl\obj\Debug\net9.0\AvaloniaVisionControl.pdb
+E:\code\AvaloniaVisionControl\obj\Debug\net9.0\ref\AvaloniaVisionControl.dll

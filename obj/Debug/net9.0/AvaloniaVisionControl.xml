@@ -1,0 +1,486 @@
+<?xml version="1.0"?>
+<doc>
+    <assembly>
+        <name>AvaloniaVisionControl</name>
+    </assembly>
+    <members>
+        <member name="T:AvaloniaVisionControl.CtlOnlyShowImage">
+            <summary>
+            Avalonia 版图像显示控件
+            支持图像显示、鼠标缩放拖拽、图元叠加显示
+            </summary>
+            <summary>
+            CtlOnlyShowImage 的坐标转换和图元绘制部分（partial class）
+            </summary>
+        </member>
+        <member name="P:AvaloniaVisionControl.CtlOnlyShowImage.AllowMouseScroll">
+            <summary>
+            是否允许鼠标滚轮缩放
+            </summary>
+        </member>
+        <member name="P:AvaloniaVisionControl.CtlOnlyShowImage.NeedShowCam">
+            <summary>
+            需要显示的相机 ID 列表
+            </summary>
+        </member>
+        <member name="M:AvaloniaVisionControl.CtlOnlyShowImage.#ctor">
+            <summary>
+            无参数构造函数（用于 XAML）
+            </summary>
+        </member>
+        <member name="M:AvaloniaVisionControl.CtlOnlyShowImage.ShowImage(AvaloniaVisionControl.ReceiveBitmapEventArgs)">
+            <summary>
+            显示图像
+            </summary>
+        </member>
+        <member name="M:AvaloniaVisionControl.CtlOnlyShowImage.GetShowCam">
+            <summary>
+            获取需要显示的相机 ID 列表
+            </summary>
+        </member>
+        <member name="F:AvaloniaVisionControl.CtlOnlyShowImage.m_9MMToPixMatrix">
+            <summary>
+            机械坐标到像素坐标的仿射变换矩阵（3×3，存储为 9 元素数组）
+            </summary>
+        </member>
+        <member name="F:AvaloniaVisionControl.CtlOnlyShowImage.m_CurrShowElement">
+            <summary>
+            当前需要显示的图元列表
+            </summary>
+        </member>
+        <member name="F:AvaloniaVisionControl.CtlOnlyShowImage.m_lineWidthScale">
+            <summary>
+            线宽缩放比例（根据仿射变换计算）
+            </summary>
+        </member>
+        <member name="M:AvaloniaVisionControl.CtlOnlyShowImage.GetTransedPts(System.Collections.Generic.List{System.Double},AvaloniaVisionControl.PaintElementType,Avalonia.Rect)">
+            <summary>
+            将机械坐标转换为控件坐标
+            </summary>
+            <param name="originData">原始机械坐标列表 [x1, y1, x2, y2, ...]</param>
+            <param name="type">图元类型</param>
+            <param name="imageRect">图像在控件中的矩形区域</param>
+            <returns>转换后的控件坐标列表</returns>
+        </member>
+        <member name="P:AvaloniaVisionControl.CtlOnlyShowImage.CtlShowPaintStatus">
+            <summary>
+            控件显示图元的状态
+            </summary>
+        </member>
+        <member name="P:AvaloniaVisionControl.CtlOnlyShowImage.CtlMouseStatus">
+            <summary>
+            控件鼠标状态
+            </summary>
+        </member>
+        <member name="M:AvaloniaVisionControl.CtlOnlyShowImage.CalcLineWidthScale">
+            <summary>
+            计算线宽缩放比例
+            </summary>
+        </member>
+        <member name="M:AvaloniaVisionControl.CtlOnlyShowImage.SetCameraCalib(System.String)">
+            <summary>
+            设置相机标定参数（通过文件路径）
+            </summary>
+        </member>
+        <member name="M:AvaloniaVisionControl.CtlOnlyShowImage.SetCameraCalib(System.Double[])">
+            <summary>
+            设置相机标定参数（像素到机械坐标的变换矩阵）
+            </summary>
+        </member>
+        <member name="M:AvaloniaVisionControl.CtlOnlyShowImage.SetCameraCalibRef(System.Double[])">
+            <summary>
+            设置相机标定参数（机械坐标到像素的变换矩阵）
+            </summary>
+        </member>
+        <member name="M:AvaloniaVisionControl.CtlOnlyShowImage.SetCameraCalib(Avalonia.Point,System.Int32,System.Int32)">
+            <summary>
+            简化版标定：只有 X、Y 像素当量
+            </summary>
+            <param name="MMpix">像素当量（若为 0.5，则 1pix=0.5mm）</param>
+            <param name="imgWidth">图像宽度</param>
+            <param name="imgHeight">图像高度</param>
+        </member>
+        <member name="M:AvaloniaVisionControl.CtlOnlyShowImage.SetPaintElements(System.Collections.Generic.List{AvaloniaVisionControl.PaintElement})">
+            <summary>
+            设置要显示的图元列表
+            </summary>
+        </member>
+        <member name="M:AvaloniaVisionControl.CtlOnlyShowImage.ChangePaintElement(System.Int32,AvaloniaVisionControl.PaintElement)">
+            <summary>
+            改变单个图元的参数
+            </summary>
+        </member>
+        <member name="M:AvaloniaVisionControl.CtlOnlyShowImage.ReFresh">
+            <summary>
+            刷新显示
+            </summary>
+        </member>
+        <member name="M:AvaloniaVisionControl.CtlOnlyShowImage.CalculateAffineTransformMatrix(System.Collections.Generic.List{Avalonia.Point},System.Collections.Generic.List{Avalonia.Point},System.Double[]@)">
+            <summary>
+            计算仿射变换矩阵（使用最小二乘法）
+            </summary>
+        </member>
+        <member name="M:AvaloniaVisionControl.CtlOnlyShowImage.SolveLinearSystem(System.Double[0:,0:],System.Double[])">
+            <summary>
+            高斯消元法求解线性方程组
+            </summary>
+        </member>
+        <member name="M:AvaloniaVisionControl.CtlOnlyShowImage.CalculateInverseTransform(System.Double[])">
+            <summary>
+            计算仿射变换的逆矩阵
+            </summary>
+        </member>
+        <member name="M:AvaloniaVisionControl.CtlOnlyShowImage.TransformPoint(Avalonia.Point,System.Double[])">
+            <summary>
+            应用仿射变换到点
+            </summary>
+        </member>
+        <member name="T:AvaloniaVisionControl.ReceiveBitmapEventArgs">
+            <summary>
+            接收图像事件参数
+            </summary>
+        </member>
+        <member name="P:AvaloniaVisionControl.ReceiveBitmapEventArgs.CamID">
+            <summary>
+            相机 ID
+            </summary>
+        </member>
+        <member name="P:AvaloniaVisionControl.ReceiveBitmapEventArgs.Image">
+            <summary>
+            图像数据
+            </summary>
+        </member>
+        <member name="T:AvaloniaVisionControl.ImageControlHelper">
+            <summary>
+            图像控件辅助类 - 简化常用操作
+            </summary>
+        </member>
+        <member name="M:AvaloniaVisionControl.ImageControlHelper.CreateImageControl(System.Int32,System.Nullable{Avalonia.Point},System.Int32,System.Int32,System.Boolean)">
+            <summary>
+            快速创建并配置图像控件
+            </summary>
+            <param name="cameraId">相机ID</param>
+            <param name="mmPerPixel">像素当量（1像素对应的毫米数）</param>
+            <param name="imageWidth">图像宽度（像素）</param>
+            <param name="imageHeight">图像高度（像素）</param>
+            <param name="allowMouseScroll">是否允许鼠标滚轮缩放</param>
+            <returns>配置好的图像控件</returns>
+        </member>
+        <member name="M:AvaloniaVisionControl.ImageControlHelper.CreateCircle(System.Double,System.Double,System.Double,Avalonia.Media.Color,System.Double,System.Boolean)">
+            <summary>
+            快速创建圆形图元
+            </summary>
+        </member>
+        <member name="M:AvaloniaVisionControl.ImageControlHelper.CreateLine(System.Double,System.Double,System.Double,System.Double,Avalonia.Media.Color,System.Double)">
+            <summary>
+            快速创建线段图元
+            </summary>
+        </member>
+        <member name="M:AvaloniaVisionControl.ImageControlHelper.CreateRectangle(System.Double,System.Double,System.Double,System.Double,Avalonia.Media.Color,System.Double,System.Boolean)">
+            <summary>
+            快速创建矩形图元
+            </summary>
+        </member>
+        <member name="M:AvaloniaVisionControl.ImageControlHelper.CreateCross(System.Double,System.Double,Avalonia.Media.Color,System.Double)">
+            <summary>
+            快速创建十字图元
+            </summary>
+        </member>
+        <member name="M:AvaloniaVisionControl.ImageControlHelper.CreatePoint(System.Double,System.Double,Avalonia.Media.Color,System.Double)">
+            <summary>
+            快速创建点图元
+            </summary>
+        </member>
+        <member name="M:AvaloniaVisionControl.ImageControlHelper.CreateText(System.Double,System.Double,System.String,Avalonia.Media.Color,System.Double)">
+            <summary>
+            快速创建文本图元
+            </summary>
+        </member>
+        <member name="M:AvaloniaVisionControl.ImageControlHelper.CreateArrow(System.Double,System.Double,System.Double,System.Double,Avalonia.Media.Color,System.Double)">
+            <summary>
+            快速创建箭头图元
+            </summary>
+        </member>
+        <member name="M:AvaloniaVisionControl.ImageControlHelper.ShowImageFromFile(AvaloniaVisionControl.CtlOnlyShowImage,System.Int32,System.String)">
+            <summary>
+            显示图像（从文件路径）
+            </summary>
+        </member>
+        <member name="M:AvaloniaVisionControl.ImageControlHelper.ShowImageFromBitmap(AvaloniaVisionControl.CtlOnlyShowImage,System.Int32,Avalonia.Media.Imaging.Bitmap)">
+            <summary>
+            显示图像（从 Bitmap）
+            </summary>
+        </member>
+        <member name="M:AvaloniaVisionControl.ImageControlHelper.AddPaintElements(AvaloniaVisionControl.CtlOnlyShowImage,AvaloniaVisionControl.PaintElement[])">
+            <summary>
+            批量添加图元并刷新显示
+            </summary>
+        </member>
+        <member name="M:AvaloniaVisionControl.ImageControlHelper.ClearPaintElements(AvaloniaVisionControl.CtlOnlyShowImage)">
+            <summary>
+            清除所有图元
+            </summary>
+        </member>
+        <member name="M:AvaloniaVisionControl.ImageControlHelper.SetSimpleCalibration(AvaloniaVisionControl.CtlOnlyShowImage,System.Double,System.Double,System.Int32,System.Int32)">
+            <summary>
+            设置简化的标定参数（像素当量）
+            </summary>
+        </member>
+        <member name="M:AvaloniaVisionControl.ImageControlHelper.SetUniformCalibration(AvaloniaVisionControl.CtlOnlyShowImage,System.Double,System.Int32,System.Int32)">
+            <summary>
+            设置等比例标定参数（X和Y方向像素当量相同）
+            </summary>
+        </member>
+        <member name="T:AvaloniaVisionControl.IShowPaintElement">
+            <summary>
+            图元显示接口
+            定义图像控件如何显示和管理图元
+            </summary>
+        </member>
+        <member name="P:AvaloniaVisionControl.IShowPaintElement.CtlShowPaintStatus">
+            <summary>
+            控件显示图元的状态
+            </summary>
+        </member>
+        <member name="P:AvaloniaVisionControl.IShowPaintElement.CtlMouseStatus">
+            <summary>
+            控件鼠标状态
+            </summary>
+        </member>
+        <member name="M:AvaloniaVisionControl.IShowPaintElement.SetCameraCalib(System.String)">
+            <summary>
+            设置相机标定参数（通过文件路径）
+            </summary>
+            <param name="calibFilePath">标定文件路径</param>
+            <returns>0 表示成功，负数表示失败</returns>
+        </member>
+        <member name="M:AvaloniaVisionControl.IShowPaintElement.SetCameraCalib(System.Double[])">
+            <summary>
+            设置相机标定参数（像素到机械坐标的变换矩阵）
+            </summary>
+            <param name="matrixPixToMM">像素→mm 的 3×3 仿射变换矩阵（9 元素数组）</param>
+            <returns>0 表示成功，负数表示失败</returns>
+        </member>
+        <member name="M:AvaloniaVisionControl.IShowPaintElement.SetCameraCalibRef(System.Double[])">
+            <summary>
+            设置相机标定参数（机械坐标到像素的变换矩阵）
+            </summary>
+            <param name="matrixMMToPix">mm→像素 的 3×3 仿射变换矩阵（9 元素数组）</param>
+            <returns>0 表示成功，负数表示失败</returns>
+        </member>
+        <member name="M:AvaloniaVisionControl.IShowPaintElement.SetUpdateCameraPos(System.Func{Avalonia.Point})">
+            <summary>
+            设置更新相机位置的回调函数
+            </summary>
+            <param name="getPosFunc">获取位置的函数</param>
+            <returns>0 表示成功，负数表示失败</returns>
+        </member>
+        <member name="M:AvaloniaVisionControl.IShowPaintElement.SetPaintElements(System.Collections.Generic.List{AvaloniaVisionControl.PaintElement})">
+            <summary>
+            设置要显示的图元列表
+            </summary>
+            <param name="needShowElement">图元列表</param>
+            <returns>0 表示成功，负数表示失败</returns>
+        </member>
+        <member name="M:AvaloniaVisionControl.IShowPaintElement.ChangePaintElement(System.Int32,AvaloniaVisionControl.PaintElement)">
+            <summary>
+            改变单个图元的参数
+            </summary>
+            <param name="index">图元索引</param>
+            <param name="element">新的图元数据</param>
+            <returns>0 表示成功，负数表示失败</returns>
+        </member>
+        <member name="M:AvaloniaVisionControl.IShowPaintElement.ReFresh">
+            <summary>
+            刷新显示
+            </summary>
+        </member>
+        <member name="T:AvaloniaVisionControl.MotionMgr">
+            <summary>
+            运动管理器（单例模式）
+            管理当前机械平台的位置信息
+            </summary>
+        </member>
+        <member name="P:AvaloniaVisionControl.MotionMgr.CurrMachPos">
+            <summary>
+            当前机械位置（X, Y 单位：mm）
+            </summary>
+        </member>
+        <member name="E:AvaloniaVisionControl.MotionMgr.CurrMachPosChanged">
+            <summary>
+            当前机械位置改变事件
+            </summary>
+        </member>
+        <member name="M:AvaloniaVisionControl.MotionMgr.UpdateMachPos(System.Double,System.Double)">
+            <summary>
+            更新当前机械位置
+            </summary>
+            <param name="x">X 坐标（mm）</param>
+            <param name="y">Y 坐标（mm）</param>
+        </member>
+        <member name="T:AvaloniaVisionControl.PaintElement">
+            <summary>
+            图元类 - 存储要绘制的图形元素
+            </summary>
+        </member>
+        <member name="P:AvaloniaVisionControl.PaintElement.Type">
+            <summary>
+            图元类型
+            </summary>
+        </member>
+        <member name="P:AvaloniaVisionControl.PaintElement.Pts">
+            <summary>
+            坐标点列表（机械坐标，单位：mm）
+            格式：[x1, y1, x2, y2, ...]
+            </summary>
+        </member>
+        <member name="P:AvaloniaVisionControl.PaintElement.LineWidth">
+            <summary>
+            线宽（像素）
+            </summary>
+        </member>
+        <member name="P:AvaloniaVisionControl.PaintElement.Color">
+            <summary>
+            颜色
+            </summary>
+        </member>
+        <member name="P:AvaloniaVisionControl.PaintElement.IsFill">
+            <summary>
+            是否填充（对于封闭图形）
+            </summary>
+        </member>
+        <member name="P:AvaloniaVisionControl.PaintElement.Text">
+            <summary>
+            文本内容（当 Type 为 Text 时使用）
+            </summary>
+        </member>
+        <member name="P:AvaloniaVisionControl.PaintElement.FontSize">
+            <summary>
+            字体大小（当 Type 为 Text 时使用）
+            </summary>
+        </member>
+        <member name="P:AvaloniaVisionControl.PaintElement.Visible">
+            <summary>
+            是否可见
+            </summary>
+        </member>
+        <member name="M:AvaloniaVisionControl.PaintElement.Paint(Avalonia.Media.DrawingContext,System.Double,System.Collections.Generic.List{System.Single})">
+            <summary>
+            绘制图元到 Avalonia DrawingContext
+            </summary>
+            <param name="context">Avalonia 绘图上下文</param>
+            <param name="lineScale">线宽缩放比例</param>
+            <param name="transformedPts">已转换到控件坐标系的点列表 [x1, y1, x2, y2, ...]</param>
+        </member>
+        <member name="T:AvaloniaVisionControl.PaintElementType">
+            <summary>
+            图元类型枚举
+            </summary>
+        </member>
+        <member name="F:AvaloniaVisionControl.PaintElementType.Point">
+            <summary>
+            点
+            </summary>
+        </member>
+        <member name="F:AvaloniaVisionControl.PaintElementType.Line">
+            <summary>
+            线段
+            </summary>
+        </member>
+        <member name="F:AvaloniaVisionControl.PaintElementType.PolyLine">
+            <summary>
+            折线
+            </summary>
+        </member>
+        <member name="F:AvaloniaVisionControl.PaintElementType.Circle">
+            <summary>
+            圆
+            </summary>
+        </member>
+        <member name="F:AvaloniaVisionControl.PaintElementType.Rectangle">
+            <summary>
+            矩形
+            </summary>
+        </member>
+        <member name="F:AvaloniaVisionControl.PaintElementType.Ellipse">
+            <summary>
+            椭圆
+            </summary>
+        </member>
+        <member name="F:AvaloniaVisionControl.PaintElementType.Polygon">
+            <summary>
+            多边形
+            </summary>
+        </member>
+        <member name="F:AvaloniaVisionControl.PaintElementType.Text">
+            <summary>
+            文本
+            </summary>
+        </member>
+        <member name="F:AvaloniaVisionControl.PaintElementType.Cross">
+            <summary>
+            十字
+            </summary>
+        </member>
+        <member name="F:AvaloniaVisionControl.PaintElementType.Arrow">
+            <summary>
+            箭头
+            </summary>
+        </member>
+        <member name="F:AvaloniaVisionControl.PaintElementType.Ring">
+            <summary>
+            圆环
+            </summary>
+        </member>
+        <member name="F:AvaloniaVisionControl.PaintElementType.Arc">
+            <summary>
+            圆弧
+            </summary>
+        </member>
+        <member name="T:AvaloniaVisionControl.ImageElementCtlStatus">
+            <summary>
+            图像控件显示状态
+            </summary>
+        </member>
+        <member name="F:AvaloniaVisionControl.ImageElementCtlStatus.None">
+            <summary>
+            不显示任何图元
+            </summary>
+        </member>
+        <member name="F:AvaloniaVisionControl.ImageElementCtlStatus.ShowAll">
+            <summary>
+            显示所有图元
+            </summary>
+        </member>
+        <member name="F:AvaloniaVisionControl.ImageElementCtlStatus.ShowSelected">
+            <summary>
+            仅显示选中的图元
+            </summary>
+        </member>
+        <member name="T:AvaloniaVisionControl.ImageCtlMouseStatus">
+            <summary>
+            图像控件鼠标状态
+            </summary>
+        </member>
+        <member name="F:AvaloniaVisionControl.ImageCtlMouseStatus.Normal">
+            <summary>
+            正常状态
+            </summary>
+        </member>
+        <member name="F:AvaloniaVisionControl.ImageCtlMouseStatus.Drawing">
+            <summary>
+            绘制状态
+            </summary>
+        </member>
+        <member name="F:AvaloniaVisionControl.ImageCtlMouseStatus.Selecting">
+            <summary>
+            选择状态
+            </summary>
+        </member>
+        <member name="F:AvaloniaVisionControl.ImageCtlMouseStatus.Dragging">
+            <summary>
+            拖拽状态
+            </summary>
+        </member>
+    </members>
+</doc>

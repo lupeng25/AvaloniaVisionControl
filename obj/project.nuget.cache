@@ -1,0 +1,32 @@
+{
+  "version": 2,
+  "dgSpecHash": "Inb3C9JmBo0=",
+  "success": true,
+  "projectFilePath": "E:\\code\\AvaloniaVisionControl\\AvaloniaVisionControl.csproj",
+  "expectedPackageFiles": [
+    "C:\\Users\\Administrator\\.nuget\\packages\\avalonia\\11.3.3\\avalonia.11.3.3.nupkg.sha512",
+    "C:\\Users\\Administrator\\.nuget\\packages\\avalonia.angle.windows.natives\\2.1.25547.20250602\\avalonia.angle.windows.natives.2.1.25547.20250602.nupkg.sha512",
+    "C:\\Users\\Administrator\\.nuget\\packages\\avalonia.buildservices\\0.0.31\\avalonia.buildservices.0.0.31.nupkg.sha512",
+    "C:\\Users\\Administrator\\.nuget\\packages\\avalonia.desktop\\11.3.3\\avalonia.desktop.11.3.3.nupkg.sha512",
+    "C:\\Users\\Administrator\\.nuget\\packages\\avalonia.freedesktop\\11.3.3\\avalonia.freedesktop.11.3.3.nupkg.sha512",
+    "C:\\Users\\Administrator\\.nuget\\packages\\avalonia.native\\11.3.3\\avalonia.native.11.3.3.nupkg.sha512",
+    "C:\\Users\\Administrator\\.nuget\\packages\\avalonia.remote.protocol\\11.3.3\\avalonia.remote.protocol.11.3.3.nupkg.sha512",
+    "C:\\Users\\Administrator\\.nuget\\packages\\avalonia.skia\\11.3.3\\avalonia.skia.11.3.3.nupkg.sha512",
+    "C:\\Users\\Administrator\\.nuget\\packages\\avalonia.win32\\11.3.3\\avalonia.win32.11.3.3.nupkg.sha512",
+    "C:\\Users\\Administrator\\.nuget\\packages\\avalonia.x11\\11.3.3\\avalonia.x11.11.3.3.nupkg.sha512",
+    "C:\\Users\\Administrator\\.nuget\\packages\\harfbuzzsharp\\8.3.1.1\\harfbuzzsharp.8.3.1.1.nupkg.sha512",
+    "C:\\Users\\Administrator\\.nuget\\packages\\harfbuzzsharp.nativeassets.linux\\8.3.1.1\\harfbuzzsharp.nativeassets.linux.8.3.1.1.nupkg.sha512",
+    "C:\\Users\\Administrator\\.nuget\\packages\\harfbuzzsharp.nativeassets.macos\\8.3.1.1\\harfbuzzsharp.nativeassets.macos.8.3.1.1.nupkg.sha512",
+    "C:\\Users\\Administrator\\.nuget\\packages\\harfbuzzsharp.nativeassets.webassembly\\8.3.1.1\\harfbuzzsharp.nativeassets.webassembly.8.3.1.1.nupkg.sha512",
+    "C:\\Users\\Administrator\\.nuget\\packages\\harfbuzzsharp.nativeassets.win32\\8.3.1.1\\harfbuzzsharp.nativeassets.win32.8.3.1.1.nupkg.sha512",
+    "C:\\Users\\Administrator\\.nuget\\packages\\microcom.runtime\\0.11.0\\microcom.runtime.0.11.0.nupkg.sha512",
+    "C:\\Users\\Administrator\\.nuget\\packages\\skiasharp\\2.88.9\\skiasharp.2.88.9.nupkg.sha512",
+    "C:\\Users\\Administrator\\.nuget\\packages\\skiasharp.nativeassets.linux\\2.88.9\\skiasharp.nativeassets.linux.2.88.9.nupkg.sha512",
+    "C:\\Users\\Administrator\\.nuget\\packages\\skiasharp.nativeassets.macos\\2.88.9\\skiasharp.nativeassets.macos.2.88.9.nupkg.sha512",
+    "C:\\Users\\Administrator\\.nuget\\packages\\skiasharp.nativeassets.webassembly\\2.88.9\\skiasharp.nativeassets.webassembly.2.88.9.nupkg.sha512",
+    "C:\\Users\\Administrator\\.nuget\\packages\\skiasharp.nativeassets.win32\\2.88.9\\skiasharp.nativeassets.win32.2.88.9.nupkg.sha512",
+    "C:\\Users\\Administrator\\.nuget\\packages\\system.io.pipelines\\8.0.0\\system.io.pipelines.8.0.0.nupkg.sha512",
+    "C:\\Users\\Administrator\\.nuget\\packages\\tmds.dbus.protocol\\0.21.2\\tmds.dbus.protocol.0.21.2.nupkg.sha512"
+  ],
+  "logs": []
+}

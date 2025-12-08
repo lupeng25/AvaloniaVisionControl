@@ -1,0 +1,288 @@
+# AvaloniaVisionControl
+  
+
+## 🚀 快速开始
+
+### 安装
+
+#### 方式1：NuGet 包
+
+```bash
+dotnet add package AvaloniaVisionControl
+```
+
+#### 方式2：项目引用
+
+```xml
+<ItemGroup>
+  <ProjectReference Include="..\AvaloniaVisionControl\AvaloniaVisionControl.csproj" />
+</ItemGroup>
+```
+
+#### 方式3：DLL 引用
+
+```xml
+<ItemGroup>
+  <Reference Include="AvaloniaVisionControl">
+    <HintPath>lib\AvaloniaVisionControl.dll</HintPath>
+  </Reference>
+</ItemGroup>
+```
+
+### 基本使用
+
+#### 1. 在 XAML 中使用
+
+```xml
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vision="using:AvaloniaVisionControl"
+        x:Class="YourApp.MainWindow"
+        Title="图像显示示例">
+    
+    <Grid>
+        <vision:CtlOnlyShowImage x:Name="ImageControl"
+                                 AllowMouseScroll="True"/>
+    </Grid>
+</Window>
+```
+
+#### 2. 在代码中使用
+
+```csharp
+using AvaloniaVisionControl;
+using Avalonia.Media.Imaging;
+using System.IO;
+
+// 创建控件
+var imageControl = new CtlOnlyShowImage(0);
+
+// 设置标定（1像素 = 0.1mm）
+imageControl.SetCameraCalib(new Point(0.1, 0.1), 1024, 768);
+
+// 加载并显示图像
+using var stream = File.OpenRead("image.png");
+var bitmap = new Bitmap(stream);
+var eventArgs = new ReceiveBitmapEventArgs(0, bitmap);
+imageControl.ShowImage(eventArgs);
+```
+
+#### 3. 添加图元
+
+```csharp
+using System.Collections.Generic;
+using Avalonia.Media;
+
+var elements = new List<PaintElement>
+{
+    new PaintElement
+    {
+        Type = PaintElementType.Circle,
+        Pts = new List<double> { 10.0, 20.0, 15.0, 20.0 },
+        Color = Colors.Red,
+        LineWidth = 2.0,
+        Visible = true
+    }
+};
+
+imageControl.SetPaintElements(elements);
+imageControl.CtlShowPaintStatus = ImageElementCtlStatus.ShowAll;
+imageControl.ReFresh();
+```
+
+## 📚 核心类
+
+### CtlOnlyShowImage
+
+主要的图像显示控件类。
+
+**主要属性**：
+- `AllowMouseScroll`: 是否允许鼠标滚轮缩放
+- `NeedShowCam`: 需要显示的相机ID列表
+- `CtlShowPaintStatus`: 图元显示状态
+- `CtlMouseStatus`: 鼠标状态
+
+**主要方法**：
+- `ShowImage(ReceiveBitmapEventArgs)`: 显示图像
+- `SetCameraCalib(...)`: 设置相机标定（多种重载）
+- `SetPaintElements(List<PaintElement>)`: 设置图元列表
+- `ChangePaintElement(int, PaintElement)`: 修改单个图元
+- `ReFresh()`: 刷新显示
+
+### PaintElement
+
+图元类，用于定义要绘制的图形元素。
+
+**支持的图元类型**：
+- `Point`: 点
+- `Line`: 线段
+- `PolyLine`: 折线
+- `Circle`: 圆
+- `Rectangle`: 矩形
+- `Ellipse`: 椭圆
+- `Polygon`: 多边形
+- `Cross`: 十字
+- `Arrow`: 箭头
+- `Ring`: 圆环
+- `Arc`: 圆弧
+- `Text`: 文本
+
+### MotionMgr
+
+运动管理器（单例），用于管理机械坐标。
+
+```csharp
+// 更新机械位置（单位：mm）
+MotionMgr.Ins.UpdateMachPos(100.0, 200.0);
+
+// 获取当前机械位置
+var pos = MotionMgr.Ins.CurrMachPos;
+```
+
+## 🎨 使用辅助类
+
+项目包含 `ImageControlHelper` 辅助类，提供更简洁的 API：
+
+```csharp
+using AvaloniaVisionControl;
+
+// 快速创建控件
+var imageControl = ImageControlHelper.CreateImageControl(
+    cameraId: 0,
+    mmPerPixel: new Point(0.1, 0.1),
+    imageWidth: 1024,
+    imageHeight: 768
+);
+
+// 快速创建图元
+var circle = ImageControlHelper.CreateCircle(10, 20, 5, Colors.Red);
+var line = ImageControlHelper.CreateLine(0, 0, 50, 50, Colors.Green);
+
+// 批量添加图元
+ImageControlHelper.AddPaintElements(imageControl, circle, line);
+```
+
+## 🖱️ 鼠标交互
+
+控件默认支持以下鼠标操作：
+
+- **滚轮缩放**：鼠标滚轮上下滚动，以鼠标位置为中心缩放
+- **拖拽平移**：按住鼠标左键拖动图像
+- **双击复位**：双击图像恢复到默认缩放比例
+
+禁用滚轮缩放：
+```csharp
+imageControl.AllowMouseScroll = false;
+```
+
+## ⚙️ 相机标定
+
+### 方式1：简化标定（像素当量）
+
+```csharp
+// 设置像素当量：1像素 = 0.1mm
+var mmPerPixel = new Point(0.1, 0.1);
+imageControl.SetCameraCalib(mmPerPixel, imageWidth, imageHeight);
+```
+
+### 方式2：变换矩阵
+
+```csharp
+// 像素到机械坐标的变换矩阵（9元素数组）
+double[] matrixPixToMM = new double[9] { /* ... */ };
+imageControl.SetCameraCalib(matrixPixToMM);
+
+// 或机械坐标到像素的变换矩阵
+double[] matrixMMToPix = new double[9] { /* ... */ };
+imageControl.SetCameraCalibRef(matrixMMToPix);
+```
+
+## 📋 完整示例
+
+```csharp
+using Avalonia;
+using Avalonia.Controls;
+using Avalonia.Media.Imaging;
+using AvaloniaVisionControl;
+using System.Collections.Generic;
+using System.IO;
+
+public class ImageViewerExample
+{
+    private CtlOnlyShowImage _imageControl;
+    
+    public void Initialize()
+    {
+        // 1. 创建控件
+        _imageControl = new CtlOnlyShowImage(0);
+        
+        // 2. 设置标定
+        _imageControl.SetCameraCalib(new Point(0.1, 0.1), 1024, 768);
+        
+        // 3. 加载图像
+        LoadImage("test.png");
+        
+        // 4. 添加图元
+        AddPaintElements();
+        
+        // 5. 更新机械位置
+        MotionMgr.Ins.UpdateMachPos(100.0, 200.0);
+    }
+    
+    private void LoadImage(string filePath)
+    {
+        using var stream = File.OpenRead(filePath);
+        var bitmap = new Bitmap(stream);
+        var eventArgs = new ReceiveBitmapEventArgs(0, bitmap);
+        _imageControl.ShowImage(eventArgs);
+    }
+    
+    private void AddPaintElements()
+    {
+        var elements = new List<PaintElement>
+        {
+            new PaintElement
+            {
+                Type = PaintElementType.Circle,
+                Pts = new List<double> { 10.0, 20.0, 15.0, 20.0 },
+                Color = Colors.Red,
+                LineWidth = 2.0,
+                Visible = true
+            },
+            new PaintElement
+            {
+                Type = PaintElementType.Cross,
+                Pts = new List<double> { 0.0, 0.0 },
+                Color = Colors.Blue,
+                LineWidth = 2.0,
+                Visible = true
+            }
+        };
+        
+        _imageControl.SetPaintElements(elements);
+        _imageControl.CtlShowPaintStatus = ImageElementCtlStatus.ShowAll;
+        _imageControl.ReFresh();
+    }
+}
+```
+
+## ⚠️ 注意事项
+
+1. **线程安全**：图像更新会自动在 UI 线程执行
+2. **资源释放**：控件会在从视觉树分离时自动释放图像资源
+3. **坐标系统**：
+   - 图元坐标使用**机械坐标**（单位：mm）
+   - 原点为视野中心
+   - 通过 `MotionMgr.Ins.CurrMachPos` 设置当前机械位置
+4. **性能建议**：
+   - 建议图元数量 < 1000 个
+   - 大图像建议使用合适的缩放比例
+
+## 📦 生成 NuGet 包
+
+```bash
+dotnet pack -c Release
+```
+
+生成的包位于：`bin/Release/AvaloniaVisionControl.1.0.0.nupkg`
+
