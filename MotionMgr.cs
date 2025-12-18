@@ -97,7 +97,7 @@ namespace AvaloniaVisionControl
         /// </summary>
         /// <param name="btn"></param>
         /// <returns></returns>
-        public int GetMotionJogButton(ref Button btn, MoveVecEnum moveVec,
+        public int GetMotionJogButton(Button btn, MoveVecEnum moveVec,
             double jogDis, AxisType assertAxis = AxisType.Null)
         {
             // 使用 PointerPressed 来模拟 MouseDown，确保“按下即动”

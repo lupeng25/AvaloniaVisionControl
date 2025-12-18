@@ -5,9 +5,6 @@
         xmlns:vision="using:AvaloniaVisionControl"
         mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
         x:Class="UserControlApp.Window3"
-        
-        xmlns:vm="using:UserControlApp.ViewModels"
-        x:DataType="vm:Window2ViewModel"
         Title="Window3 - 图像显示控件测试">
 
     <Grid>

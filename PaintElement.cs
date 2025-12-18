@@ -175,7 +175,6 @@ namespace AvaloniaVisionControl
 
             switch (Type)
             {
-                case PaintElementType.Point:
                 case PaintElementType.Dot:
                     PaintDot(context, brush, transformedPts, actualLineWidth);
                     break;
@@ -208,7 +207,6 @@ namespace AvaloniaVisionControl
                     break;
 
                 case PaintElementType.Rect:
-                case PaintElementType.Rectangle:
                     PaintRectangle(context, pen, brush, transformedPts);
                     break;
 

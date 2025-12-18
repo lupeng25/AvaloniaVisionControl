@@ -82,7 +82,7 @@ namespace AvaloniaVisionControl
         {
             return new PaintElement
             {
-                Type = PaintElementType.Rectangle,
+                Type = PaintElementType.Rect,
                 Pts = new List<double> { x1, y1, x2, y2 },
                 Color = color,
                 LineWidth = lineWidth,
@@ -115,7 +115,7 @@ namespace AvaloniaVisionControl
         {
             return new PaintElement
             {
-                Type = PaintElementType.Point,
+                Type = PaintElementType.Dot,
                 Pts = new List<double> { x, y },
                 Color = color,
                 LineWidth = size,
@@ -205,7 +205,7 @@ namespace AvaloniaVisionControl
             }
 
             control.SetPaintElements(currentElements);
-            control.CtlShowPaintStatus = ImageElementCtlStatus.ShowAll;
+            control.CtlShowPaintStatus = ImageElementCtlStatus.ShowDragImageAndLayer;
             control.ReFresh();
         }
 

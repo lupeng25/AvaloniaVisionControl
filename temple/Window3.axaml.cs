@@ -11,7 +11,6 @@ using AvaloniaVisionControl;
 using System;
 using System.Collections.Generic;
 using System.IO;
-using UserControlApp.ViewModels;
 
 namespace UserControlApp;
 
@@ -21,27 +20,28 @@ public partial class Window3 : Window
 
     public Window3()
     {
-        // ´°¿Ú»ù´¡ÉèÖÃ
-        Title = "Window3 - Í¼ÏñÏÔÊ¾¿Ø¼ş²âÊÔ";
+        // ï¿½ï¿½ï¿½Ú»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
+        Title = "Window3 - Í¼ï¿½ï¿½ï¿½ï¿½Ê¾ï¿½Ø¼ï¿½ï¿½ï¿½ï¿½ï¿½";
         Width = 1024;
         Height = 768;
         WindowStartupLocation = WindowStartupLocation.CenterScreen;
 
         InitializeComponent();
         
-        // »ñÈ¡Í¼Ïñ¿Ø¼şÒıÓÃ
+        // ï¿½ï¿½È¡Í¼ï¿½ï¿½Ø¼ï¿½ï¿½ï¿½ï¿½ï¿½
         _imageControl = this.FindControl<CtlOnlyShowImage>("ImageControl");
         
-        // ÉèÖÃÄ¬ÈÏ±ê¶¨£¨Ê¾Àı£º1ÏñËØ = 0.1mm£©
+        // è®¾ç½®é»˜è®¤æ ‡å®šï¼ˆå‡è®¾1åƒç´  = 0.1mmï¼‰
         if (_imageControl != null)
         {
             var mmPerPixel = new Point(0.1, 0.1);
-            _imageControl.SetCameraCalib(mmPerPixel, 1024, 768);
+            // é»˜è®¤ xRever = -1, yRever = -1
+            _imageControl.SetCameraCalib(mmPerPixel, 1024, 768, -1, -1);
         }
     }
 
     /// <summary>
-    /// ¼ÓÔØÍ¼Ïñ°´Å¥µã»÷ÊÂ¼ş
+    /// ï¿½ï¿½ï¿½ï¿½Í¼ï¿½ï¿½Å¥ï¿½ï¿½ï¿½ï¿½Â¼ï¿½
     /// </summary>
     private async void BtnLoadImage_Click(object sender, RoutedEventArgs e)
     {
@@ -49,11 +49,11 @@ public partial class Window3 : Window
         {
             var dialog = new OpenFileDialog
             {
-                Title = "Ñ¡ÔñÍ¼ÏñÎÄ¼ş",
+                Title = "Ñ¡ï¿½ï¿½Í¼ï¿½ï¿½ï¿½Ä¼ï¿½",
                 Filters = new List<FileDialogFilter>
                 {
-                    new FileDialogFilter { Name = "Í¼ÏñÎÄ¼ş", Extensions = new List<string> { "png", "jpg", "jpeg", "bmp" } },
-                    new FileDialogFilter { Name = "ËùÓĞÎÄ¼ş", Extensions = new List<string> { "*" } }
+                    new FileDialogFilter { Name = "Í¼ï¿½ï¿½ï¿½Ä¼ï¿½", Extensions = new List<string> { "png", "jpg", "jpeg", "bmp" } },
+                    new FileDialogFilter { Name = "ï¿½ï¿½ï¿½ï¿½ï¿½Ä¼ï¿½", Extensions = new List<string> { "*" } }
                 }
             };
 
@@ -73,13 +73,13 @@ public partial class Window3 : Window
         }
         catch (Exception ex)
         {
-            // ¼òµ¥µÄ´íÎóÌáÊ¾
-            Console.WriteLine($"¼ÓÔØÍ¼ÏñÊ§°Ü: {ex.Message}");
+            // ï¿½òµ¥µÄ´ï¿½ï¿½ï¿½ï¿½ï¿½Ê¾
+            Console.WriteLine($"ï¿½ï¿½ï¿½ï¿½Í¼ï¿½ï¿½Ê§ï¿½ï¿½: {ex.Message}");
         }
     }
 
     /// <summary>
-    /// Ìí¼ÓÍ¼Ôª°´Å¥µã»÷ÊÂ¼ş
+    /// ï¿½ï¿½ï¿½ï¿½Í¼Ôªï¿½ï¿½Å¥ï¿½ï¿½ï¿½ï¿½Â¼ï¿½
     /// </summary>
     private void BtnAddElements_Click(object sender, RoutedEventArgs e)
     {
@@ -87,7 +87,7 @@ public partial class Window3 : Window
 
         var elements = new List<PaintElement>();
 
-        // Ìí¼ÓÒ»¸öºìÉ«Ô²£¨»úĞµ×ø±ê£ºÖĞĞÄ (10, 20)£¬°ë¾¶ 5mm£©
+        // ï¿½ï¿½ï¿½ï¿½Ò»ï¿½ï¿½ï¿½ï¿½É«Ô²ï¿½ï¿½ï¿½ï¿½Ğµï¿½ï¿½ï¿½ê£ºï¿½ï¿½ï¿½ï¿½ (10, 20)ï¿½ï¿½ï¿½ë¾¶ 5mmï¿½ï¿½
         elements.Add(new PaintElement
         {
             Type = PaintElementType.Circle,
@@ -98,10 +98,10 @@ public partial class Window3 : Window
             Visible = true
         });
 
-        // Ìí¼ÓÒ»¸öÂÌÉ«¾ØĞÎ
+        // ï¿½ï¿½ï¿½ï¿½Ò»ï¿½ï¿½ï¿½ï¿½É«ï¿½ï¿½ï¿½ï¿½
         elements.Add(new PaintElement
         {
-            Type = PaintElementType.Rectangle,
+            Type = PaintElementType.Rect,
             Pts = new List<double> { -20.0, -20.0, 20.0, 20.0 },
             Color = Colors.Green,
             LineWidth = 1.5,
@@ -109,7 +109,7 @@ public partial class Window3 : Window
             Visible = true
         });
 
-        // Ìí¼ÓÒ»¸öÀ¶É«Ê®×Ö£¨ÖĞĞÄµã£©
+        // ï¿½ï¿½ï¿½ï¿½Ò»ï¿½ï¿½ï¿½ï¿½É«Ê®ï¿½Ö£ï¿½ï¿½ï¿½ï¿½Äµã£©
         elements.Add(new PaintElement
         {
             Type = PaintElementType.Cross,
@@ -119,24 +119,24 @@ public partial class Window3 : Window
             Visible = true
         });
 
-        // Ìí¼ÓÎÄ±¾
+        // ï¿½ï¿½ï¿½ï¿½ï¿½Ä±ï¿½
         elements.Add(new PaintElement
         {
             Type = PaintElementType.Text,
             Pts = new List<double> { 0.0, -10.0 },  
-            Text = "²âÊÔÍ¼Ôª",
+            Text = "ï¿½ï¿½ï¿½ï¿½Í¼Ôª",
             FontSize = 16,
             Color = Colors.Yellow, 
             Visible = true
         });
 
         _imageControl.SetPaintElements(elements);
-        _imageControl.CtlShowPaintStatus = ImageElementCtlStatus.ShowAll;
+        _imageControl.CtlShowPaintStatus = ImageElementCtlStatus.ShowDragImageAndLayer;
         _imageControl.ReFresh();
     }
 
     /// <summary>
-    /// Çå³ıÍ¼Ôª°´Å¥µã»÷ÊÂ¼ş
+    /// ï¿½ï¿½ï¿½Í¼Ôªï¿½ï¿½Å¥ï¿½ï¿½ï¿½ï¿½Â¼ï¿½
     /// </summary>
     private void BtnClearElements_Click(object sender, RoutedEventArgs e)
     {
