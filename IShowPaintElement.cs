@@ -35,6 +35,17 @@ namespace AvaloniaVisionControl
         int SetCameraCalib(double[] matrixPixToMM);
 
         /// <summary>
+        /// 简单标定：设置像素当量
+        /// </summary>
+        /// <param name="MMpix">像素当量（1像素代表多少mm）</param>
+        /// <param name="imgWidth">图像宽度</param>
+        /// <param name="imgHeight">图像高度</param>
+        /// <param name="xRever">X轴反转（-1反转，1不反转）</param>
+        /// <param name="yRever">Y轴反转（-1反转，1不反转）</param>
+        /// <returns></returns>
+        int SetCameraCalib(Point MMpix, int imgWidth, int imgHeight, int xRever = -1, int yRever = -1);
+
+        /// <summary>
         /// 设置相机标定参数（机械坐标到像素的变换矩阵）
         /// </summary>
         /// <param name="matrixMMToPix">mm→像素 的 3×3 仿射变换矩阵（9 元素数组）</param>

@@ -1,4 +1,5 @@
-﻿using System;
+using System;
+using System.Collections.Generic;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
@@ -6,6 +7,7 @@ using Avalonia.Media;
 using Avalonia.Media.Imaging;
 using Avalonia.Threading;
 using Avalonia.Interactivity;
+
 namespace AvaloniaVisionControl
 {
     /// <summary>
@@ -14,16 +16,20 @@ namespace AvaloniaVisionControl
     /// </summary>
     public partial class CtlOnlyShowImage : Control, IShowPaintElement
     {
-        private Bitmap _originImage;
-        private double _currentZoomFactor = 1.0;
-        private double _defZoomFactor = 1.0;
-        private const double ZoomStep = 0.3;
-        private bool _isDragging;
-        private Point _dragStartPoint;
-        private Point _pressStartPoint; // 按下时的初始位置，用于判断单击
-        private Point _scrollImageLocation = new Point(0, 0);
-        private int _lastImageHeight = 0;
-        private int _lastImageWidth = 0;
+        private Bitmap originImage;
+        private double currentZoomFactor = 0.2;
+        private double defZoomFactor = 0.2;
+        private const double zoomStep = 0.3;
+        private bool isDragging;
+        private Point dragStartPoint;
+        private Point pressStartPoint; // 按下时的初始位置，用于判断单击
+        private Point scrollImageLocation = new Point(0, 0);
+        /// <summary>
+        /// 缩放图片的宽高
+        /// </summary>
+        private Point scrollImageWH = new Point(0, 0);
+        private int lastImageHeight = 0;
+        private int lastImageWidth = 0;
         private const double ClickThreshold = 5.0; // 单击判断阈值（像素）
 
         /// <summary>
@@ -63,14 +69,14 @@ namespace AvaloniaVisionControl
 
         private void CurrMachPosChanged(object sender, EventArgs e)
         {
-            InvalidateVisual();
+            ReFresh();
         }
 
         protected override void OnPointerWheelChanged(PointerWheelEventArgs e)
         {
             base.OnPointerWheelChanged(e);
 
-            if (!AllowMouseScroll || _originImage == null)
+            if (!AllowMouseScroll || originImage == null)
                 return;
 
             var imageRect = GetImageRectangle();
@@ -80,36 +86,37 @@ namespace AvaloniaVisionControl
                 return;
 
             // 获取鼠标相对于图片的位置
-            double mouseX = (mousePos.X - _scrollImageLocation.X) / _currentZoomFactor;
-            double mouseY = (mousePos.Y - _scrollImageLocation.Y) / _currentZoomFactor;
+            double mouseX = (mousePos.X - scrollImageLocation.X) / currentZoomFactor;
+            double mouseY = (mousePos.Y - scrollImageLocation.Y) / currentZoomFactor;
 
-            double oldZoomFactor = _currentZoomFactor;
+            double oldZoomFactor = currentZoomFactor;
 
             // 根据滚轮方向调整缩放比例
             if (e.Delta.Y > 0)
             {
-                _currentZoomFactor *= (1 + ZoomStep);
+                currentZoomFactor *= (1 + zoomStep);
             }
             else
             {
-                _currentZoomFactor *= (1 - ZoomStep);
+                currentZoomFactor *= (1 - zoomStep);
             }
 
-            _currentZoomFactor = Math.Max(_defZoomFactor, Math.Min(_currentZoomFactor, 100.0));
+            currentZoomFactor = Math.Max(defZoomFactor, Math.Min(currentZoomFactor, 100.0));
 
-            if (_currentZoomFactor == _defZoomFactor)
+            if (currentZoomFactor == defZoomFactor)
             {
-                _scrollImageLocation = new Point(0, 0);
+                scrollImageLocation = new Point(0, 0);
             }
             else
             {
                 // 计算缩放后的图片位置，使鼠标位置保持相对不变
-                _scrollImageLocation = new Point(
-                    mousePos.X - mouseX * _currentZoomFactor,
-                    mousePos.Y - mouseY * _currentZoomFactor
+                scrollImageLocation = new Point(
+                    mousePos.X - mouseX * currentZoomFactor,
+                    mousePos.Y - mouseY * currentZoomFactor
                 );
             }
 
+            UpdateCursorStyle(mousePos);
             InvalidateVisual();
         }
 
@@ -118,18 +125,39 @@ namespace AvaloniaVisionControl
             base.OnPointerPressed(e);
 
             var point = e.GetCurrentPoint(this);
+            var mousePos = e.GetPosition(this);
+
             if (point.Properties.IsLeftButtonPressed)
             {
                 var imageRect = GetImageRectangle();
-                var mousePos = e.GetPosition(this);
                 
                 if (!imageRect.Contains(mousePos))
                     return;
 
-                _isDragging = true;
-                _dragStartPoint = mousePos;
-                _pressStartPoint = mousePos; // 保存按下时的初始位置
+                isDragging = true;
+                dragStartPoint = mousePos;
+                pressStartPoint = mousePos; // 保存按下时的初始位置
                 Cursor = new Cursor(StandardCursorType.Hand);
+            }
+            else if (point.Properties.IsRightButtonPressed)
+            {
+                // 右键移动逻辑
+                if (CtlMouseStatus == ImageCtlMouseStatus.RightClickMove && originImage != null)
+                {
+                    try
+                    {
+                        var machPt = CtlPtToMachPt(mousePos);
+                        if (MotionMgr.Ins.AxisFunc != null)
+                        {
+                            int outInt;
+                            string sErr;
+                            var list = new List<double> { machPt.X, machPt.Y };
+                            MotionMgr.Ins.AxisFunc(AxisOperationType.MoveAndWait, AxisType.XY,
+                                list, out outInt, out sErr);
+                        }
+                    }
+                    catch { }
+                }
             }
         }
 
@@ -137,19 +165,19 @@ namespace AvaloniaVisionControl
         {
             base.OnPointerMoved(e);
 
-            if (_isDragging)
+            if (isDragging)
             {
                 var mousePos = e.GetPosition(this);
-                double deltaX = mousePos.X - _dragStartPoint.X;
-                double deltaY = mousePos.Y - _dragStartPoint.Y;
+                double deltaX = mousePos.X - dragStartPoint.X;
+                double deltaY = mousePos.Y - dragStartPoint.Y;
 
-                _scrollImageLocation = new Point(
-                    _scrollImageLocation.X + deltaX,
-                    _scrollImageLocation.Y + deltaY
+                scrollImageLocation = new Point(
+                    scrollImageLocation.X + deltaX,
+                    scrollImageLocation.Y + deltaY
                 );
 
                 LimitImageWithinBounds();
-                _dragStartPoint = mousePos;
+                dragStartPoint = mousePos;
                 InvalidateVisual();
             }
             else
@@ -168,27 +196,27 @@ namespace AvaloniaVisionControl
                 var mousePos = e.GetPosition(this);
                 
                 // 检查是否是单击（不是拖拽）
-                if (_isDragging)
+                if (isDragging)
                 {
                     // 使用按下时的初始位置计算总移动距离
                     double dragDistance = Math.Sqrt(
-                        Math.Pow(mousePos.X - _pressStartPoint.X, 2) + 
-                        Math.Pow(mousePos.Y - _pressStartPoint.Y, 2)
+                        Math.Pow(mousePos.X - pressStartPoint.X, 2) + 
+                        Math.Pow(mousePos.Y - pressStartPoint.Y, 2)
                     );
                     
                     // 如果移动距离小于阈值，认为是单击
                     if (dragDistance < ClickThreshold)
                     {
                         var imageRect = GetImageRectangle();
-                        if (imageRect.Contains(mousePos) && _originImage != null)
+                        if (imageRect.Contains(mousePos) && originImage != null)
                         {
                             // 计算鼠标在图像中的原始坐标
-                            double imageX = (mousePos.X - _scrollImageLocation.X) / _currentZoomFactor;
-                            double imageY = (mousePos.Y - _scrollImageLocation.Y) / _currentZoomFactor;
+                            double imageX = (mousePos.X - scrollImageLocation.X) / currentZoomFactor;
+                            double imageY = (mousePos.Y - scrollImageLocation.Y) / currentZoomFactor;
                             
                             // 确保坐标在图像范围内
-                            imageX = Math.Max(0, Math.Min(imageX, _originImage.PixelSize.Width));
-                            imageY = Math.Max(0, Math.Min(imageY, _originImage.PixelSize.Height));
+                            imageX = Math.Max(0, Math.Min(imageX, originImage.PixelSize.Width));
+                            imageY = Math.Max(0, Math.Min(imageY, originImage.PixelSize.Height));
                             
                             // 触发单击事件
                             ImageClick?.Invoke(this, new ImageClickEventArgs(
@@ -199,24 +227,24 @@ namespace AvaloniaVisionControl
                     }
                 }
                 
-                _isDragging = false;
+                isDragging = false;
                 Cursor = Cursor.Default;
             }
         }
 
         private void OnDoubleTapped(object sender, RoutedEventArgs e)
         {
-            _currentZoomFactor = _defZoomFactor;
-            _scrollImageLocation = new Point(0, 0);
+            currentZoomFactor = defZoomFactor;
+            scrollImageLocation = new Point(0, 0);
             InvalidateVisual();
         }
 
         private void UpdateCursorStyle(Point mousePosition)
         {
-            if (_originImage != null)
+            if (originImage != null)
             {
                 var imageRect = GetImageRectangle();
-                if (imageRect.Contains(mousePosition) && _currentZoomFactor > _defZoomFactor)
+                if (imageRect.Contains(mousePosition) && currentZoomFactor > defZoomFactor)
                 {
                     Cursor = new Cursor(StandardCursorType.Hand);
                 }
@@ -229,31 +257,31 @@ namespace AvaloniaVisionControl
 
         private void LimitImageWithinBounds()
         {
-            if (_originImage == null) return;
+            if (originImage == null) return;
 
-            double imageWidth = _originImage.PixelSize.Width * _currentZoomFactor;
-            double imageHeight = _originImage.PixelSize.Height * _currentZoomFactor;
+            double imageWidth = originImage.PixelSize.Width * currentZoomFactor;
+            double imageHeight = originImage.PixelSize.Height * currentZoomFactor;
 
             double minX = Math.Min(0, Bounds.Width - imageWidth);
             double maxX = Math.Max(0, Bounds.Width - imageWidth);
             double minY = Math.Min(0, Bounds.Height - imageHeight);
             double maxY = Math.Max(0, Bounds.Height - imageHeight);
 
-            _scrollImageLocation = new Point(
-                Math.Max(minX, Math.Min(_scrollImageLocation.X, maxX)),
-                Math.Max(minY, Math.Min(_scrollImageLocation.Y, maxY))
+            scrollImageLocation = new Point(
+                Math.Max(minX, Math.Min(scrollImageLocation.X, maxX)),
+                Math.Max(minY, Math.Min(scrollImageLocation.Y, maxY))
             );
         }
 
         private Rect GetImageRectangle()
         {
-            if (_originImage == null)
+            if (originImage == null)
                 return new Rect();
 
-            double imageWidth = _originImage.PixelSize.Width * _currentZoomFactor;
-            double imageHeight = _originImage.PixelSize.Height * _currentZoomFactor;
+            double imageWidth = originImage.PixelSize.Width * currentZoomFactor;
+            double imageHeight = originImage.PixelSize.Height * currentZoomFactor;
             
-            return new Rect(_scrollImageLocation, new Size(imageWidth, imageHeight));
+            return new Rect(scrollImageLocation, new Size(imageWidth, imageHeight));
         }
 
         public override void Render(DrawingContext context)
@@ -263,45 +291,63 @@ namespace AvaloniaVisionControl
             // 绘制棋盘背景
             DrawCheckerboardBackground(context, Bounds);
 
-            if (_originImage == null)
+            if (originImage == null)
                 return;
 
             // 计算默认缩放比
-            if (_lastImageHeight != _originImage.PixelSize.Height || 
-                _lastImageWidth != _originImage.PixelSize.Width)
+            if (lastImageHeight != originImage.PixelSize.Height || 
+                lastImageWidth != originImage.PixelSize.Width)
             {
-                _defZoomFactor = Math.Min(
-                    Bounds.Width / _originImage.PixelSize.Width,
-                    Bounds.Height / _originImage.PixelSize.Height
-                );
-                _currentZoomFactor = _defZoomFactor;
-                _lastImageHeight = _originImage.PixelSize.Height;
-                _lastImageWidth = _originImage.PixelSize.Width;
+                // 避免除以0
+                if (originImage.PixelSize.Width > 0 && originImage.PixelSize.Height > 0 && Bounds.Width > 0 && Bounds.Height > 0)
+                {
+                    defZoomFactor = Math.Min(
+                        Bounds.Width / originImage.PixelSize.Width,
+                        Bounds.Height / originImage.PixelSize.Height
+                    );
+                    currentZoomFactor = defZoomFactor;
+                    lastImageHeight = originImage.PixelSize.Height;
+                    lastImageWidth = originImage.PixelSize.Width;
+                }
             }
 
             // 计算缩放后的图片大小
-            double newW = _originImage.PixelSize.Width * _currentZoomFactor;
-            double newH = _originImage.PixelSize.Height * _currentZoomFactor;
+            double newW = originImage.PixelSize.Width * currentZoomFactor;
+            double newH = originImage.PixelSize.Height * currentZoomFactor;
 
             // 绘制图像
-            var destRect = new Rect(_scrollImageLocation.X, _scrollImageLocation.Y, newW, newH);
+            var destRect = new Rect(scrollImageLocation.X, scrollImageLocation.Y, newW, newH);
             
             // 直接绘制图像（Avalonia 会自动处理插值）
-            context.DrawImage(_originImage, destRect);
+            context.DrawImage(originImage, destRect);
+
+            // 更新 scrollImageWH
+            scrollImageWH = new Point(newW, newH);
 
             // 绘制图元
-            if (m_CurrShowElement.Count > 0 && CtlShowPaintStatus > 0)
+            if (m_CurrShowElement.Count > 0 && (int)CtlShowPaintStatus > 0)
             {
                 var imageRect = GetImageRectangle();
                 foreach (var element in m_CurrShowElement)
                 {
+                    // 处理动态更新机械位置
+                    if (element.IndexShowCurrMachPos >= 0)
+                    {
+                        var machPos = MotionMgr.Ins.CurrMachPos;
+                        if (element.Pts.Count > (element.IndexShowCurrMachPos + 1) * 2 + 1)
+                        {
+                            element.Pts[(element.IndexShowCurrMachPos + 1) * 2] = machPos.X;
+                            element.Pts[(element.IndexShowCurrMachPos + 1) * 2 + 1] = machPos.Y;
+                        }
+                    }
+
                     var newPt = GetTransedPts(element.Pts, element.Type, imageRect);
                     if (newPt.Count > 0)
-                        element.Paint(context, m_lineWidthScale * _currentZoomFactor, newPt);
+                        element.Paint(context, m_lineWidthScale * currentZoomFactor, newPt);
                 }
             }
         }
-        //修改处：
+
         /// <summary>
         /// 
         /// </summary>
@@ -310,17 +356,18 @@ namespace AvaloniaVisionControl
         protected override Size MeasureOverride(Size availableSize)
         {
             // 若有图片，返回图片尺寸；若无，返回默认尺寸（避免宽高为0）
-            if (_originImage != null)
+            if (originImage != null)
             {
                 // 按图片原始尺寸返回（或根据缩放比例计算）
                 return new Size(
-                    _originImage.PixelSize.Width * _currentZoomFactor,
-                    _originImage.PixelSize.Height * _currentZoomFactor
+                    originImage.PixelSize.Width * currentZoomFactor,
+                    originImage.PixelSize.Height * currentZoomFactor
                 );
             }
             // 无图片时返回默认尺寸（避免布局异常）
             return new Size(800, 450); // 可根据需求调整默认值
         }
+
         private void DrawCheckerboardBackground(DrawingContext context, Rect area)
         {
             const int gridSize = 10;
@@ -344,7 +391,7 @@ namespace AvaloniaVisionControl
         {
             foreach (var index in NeedShowCam)
             {
-                if (e.CamID == index)
+                if (e.CamID == index || index == -1)
                 {
                     if (e.Image == null)
                         continue;
@@ -352,8 +399,8 @@ namespace AvaloniaVisionControl
                     // 在 UI 线程更新图像
                     Dispatcher.UIThread.Post(() =>
                     {
-                        _originImage?.Dispose();
-                        _originImage = e.Image;
+                        originImage?.Dispose();
+                        originImage = e.Image;
                         InvalidateVisual();
                     });
 
@@ -380,10 +427,8 @@ namespace AvaloniaVisionControl
             MotionMgr.Ins.CurrMachPosChanged -= CurrMachPosChanged;
             
             // 释放资源
-            _originImage?.Dispose();
-            //修改处：
-            _originImage = null;
+            originImage?.Dispose();
+            originImage = null;
         }
     }
 }
-

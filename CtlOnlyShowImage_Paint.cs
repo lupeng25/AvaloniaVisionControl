@@ -1,10 +1,10 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using Avalonia;
 using Avalonia.Controls;
 
 namespace AvaloniaVisionControl
-{ 
+{
     /// <summary>
     /// CtlOnlyShowImage 的坐标转换和图元绘制部分（partial class）
     /// </summary>
@@ -16,6 +16,11 @@ namespace AvaloniaVisionControl
         private double[] m_9MMToPixMatrix = new double[9];
 
         /// <summary>
+        /// 像素坐标到机械坐标的仿射变换矩阵
+        /// </summary>
+        private double[] m_9PixToMMMatrix = new double[9];
+
+        /// <summary>
         /// 当前需要显示的图元列表
         /// </summary>
         private List<PaintElement> m_CurrShowElement = new List<PaintElement>();
@@ -24,6 +29,16 @@ namespace AvaloniaVisionControl
         /// 线宽缩放比例（根据仿射变换计算）
         /// </summary>
         private double m_lineWidthScale = 1;
+
+        /// <summary>
+        /// 控件显示图元的状态
+        /// </summary>
+        public ImageElementCtlStatus CtlShowPaintStatus { get; set; }
+
+        /// <summary>
+        /// 控件鼠标状态
+        /// </summary>
+        public ImageCtlMouseStatus CtlMouseStatus { get; set; }
 
         /// <summary>
         /// 将机械坐标转换为控件坐标
@@ -64,13 +79,13 @@ namespace AvaloniaVisionControl
                 
                 // 图像坐标转控件坐标
                 Point ctlV = new Point(
-                    pixV.X * _currentZoomFactor + _scrollImageLocation.X,
-                    pixV.Y * _currentZoomFactor + _scrollImageLocation.Y
+                    pixV.X * currentZoomFactor + scrollImageLocation.X,
+                    pixV.Y * currentZoomFactor + scrollImageLocation.Y
                 );
 
-                // 判断点是否在可见区域内
-                if (type == PaintElementType.Line || type == PaintElementType.Text)
+                if (type == PaintElementType.Line)
                 {
+                    // 简单的线可见性判断，可优化
                     IsInImageRect = true;
                 }
                 else if (!IsInImageRect)
@@ -99,14 +114,28 @@ namespace AvaloniaVisionControl
         }
 
         /// <summary>
-        /// 控件显示图元的状态
+        /// 将控件坐标转换为机械坐标
         /// </summary>
-        public ImageElementCtlStatus CtlShowPaintStatus { get; set; }
+        protected Point CtlPtToMachPt(Point ctlPt)
+        {
+            Point outPt = new Point();
+            // 将控件坐标先转图像坐标
+            Point imgV = new Point(
+                (ctlPt.X - scrollImageLocation.X) / currentZoomFactor,
+                (ctlPt.Y - scrollImageLocation.Y) / currentZoomFactor
+            );
+            
+            // 用仿射变换矩阵转成机械坐标
+            Point machPt = TransformPoint(imgV, m_9PixToMMMatrix);
+            
+            // 加上视野中心坐标 
+            outPt = new Point(
+                machPt.X + MotionMgr.Ins.CurrMachPos.X,
+                machPt.Y + MotionMgr.Ins.CurrMachPos.Y
+            );
 
-        /// <summary>
-        /// 控件鼠标状态
-        /// </summary>
-        public ImageCtlMouseStatus CtlMouseStatus { get; set; }
+            return outPt;
+        }
 
         /// <summary>
         /// 计算线宽缩放比例
@@ -134,6 +163,7 @@ namespace AvaloniaVisionControl
         /// </summary>
         public int SetCameraCalib(double[] matrixPixToMM)
         {
+            m_9PixToMMMatrix = matrixPixToMM;
             m_9MMToPixMatrix = CalculateInverseTransform(matrixPixToMM);
             CalcLineWidthScale();
             return 0;
@@ -145,6 +175,7 @@ namespace AvaloniaVisionControl
         public int SetCameraCalibRef(double[] matrixMMToPix)
         {
             m_9MMToPixMatrix = matrixMMToPix;
+            m_9PixToMMMatrix = CalculateInverseTransform(matrixMMToPix);
             CalcLineWidthScale();
             return 0;
         }
@@ -155,7 +186,7 @@ namespace AvaloniaVisionControl
         /// <param name="MMpix">像素当量（若为 0.5，则 1pix=0.5mm）</param>
         /// <param name="imgWidth">图像宽度</param>
         /// <param name="imgHeight">图像高度</param>
-        public int SetCameraCalib(Point MMpix, int imgWidth, int imgHeight)
+        public int SetCameraCalib(Point MMpix, int imgWidth, int imgHeight, int xRever = -1, int yRever = -1)
         {
             // 计算仿射变换矩阵
             List<Point> mmPoints = new List<Point>();
@@ -163,26 +194,30 @@ namespace AvaloniaVisionControl
             int halfX = imgWidth / 2;
             int halfY = imgHeight / 2;
 
-            mmPoints.Add(new Point(-1, 1));
+            // 默认反转，兼容 ShareMemRPC 默认值
+            // ShareMemRPC: xRever = -1, yRever = -1
+            
+            mmPoints.Add(new Point(-1 * xRever, 1 * yRever));
             pixPoints.Add(new Point(halfX - 1.0 / MMpix.X, halfY - 1.0 / MMpix.Y));
-            mmPoints.Add(new Point(0, 1));
+            mmPoints.Add(new Point(0, 1 * yRever));
             pixPoints.Add(new Point(halfX, halfY - 1.0 / MMpix.Y));
-            mmPoints.Add(new Point(1, 1));
+            mmPoints.Add(new Point(1 * xRever, 1 * yRever));
             pixPoints.Add(new Point(halfX + 1.0 / MMpix.X, halfY - 1.0 / MMpix.Y));
-            mmPoints.Add(new Point(-1, 0));
+            mmPoints.Add(new Point(-1 * xRever, 0));
             pixPoints.Add(new Point(halfX - 1.0 / MMpix.X, halfY));
             mmPoints.Add(new Point(0, 0));
             pixPoints.Add(new Point(halfX, halfY));
-            mmPoints.Add(new Point(1, 0));
+            mmPoints.Add(new Point(1 * xRever, 0));
             pixPoints.Add(new Point(halfX + 1.0 / MMpix.X, halfY));
-            mmPoints.Add(new Point(-1, -1));
+            mmPoints.Add(new Point(-1 * xRever, -1 * yRever));
             pixPoints.Add(new Point(halfX - 1.0 / MMpix.X, halfY + 1.0 / MMpix.Y));
-            mmPoints.Add(new Point(0, -1));
+            mmPoints.Add(new Point(0, -1 * yRever));
             pixPoints.Add(new Point(halfX, halfY + 1.0 / MMpix.Y));
-            mmPoints.Add(new Point(1, -1));
+            mmPoints.Add(new Point(1 * xRever, -1 * yRever));
             pixPoints.Add(new Point(halfX + 1.0 / MMpix.X, halfY + 1.0 / MMpix.Y));
 
             int ret = CalculateAffineTransformMatrix(mmPoints, pixPoints, out m_9MMToPixMatrix);
+            CalculateAffineTransformMatrix(pixPoints, mmPoints, out m_9PixToMMMatrix);
             CalcLineWidthScale();
             return ret;
         }
@@ -216,43 +251,78 @@ namespace AvaloniaVisionControl
         /// </summary>
         public void ReFresh()
         {
-            InvalidateVisual();
+            Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+            {
+                InvalidateVisual();
+            });
         }
 
         /// <summary>
-        /// 将图像像素坐标转换为机械坐标（绝对坐标，单位：mm）
+        /// 判断两条线段是否相交
         /// </summary>
-        /// <param name="imagePixelPosition">图像中的像素坐标</param>
-        /// <returns>机械坐标（绝对坐标，单位：mm）</returns>
-        public Point ConvertImageToMachinePosition(Point imagePixelPosition)
+        private bool LinesIntersect(
+             double x1, double y1, double x2, double y2, // 线段1
+             double x3, double y3, double x4, double y4) // 线段2
         {
-            if (_originImage == null)
-                throw new InvalidOperationException("图像未加载，无法进行坐标转换");
+            // 快速排斥实验
+            if ((x1 > x2 ? x1 : x2) < (x3 < x4 ? x3 : x4) ||
+                (x1 < x2 ? x1 : x2) > (x3 > x4 ? x3 : x4) ||
+                (y1 > y2 ? y1 : y2) < (y3 < y4 ? y3 : y4) ||
+                (y1 < y2 ? y1 : y2) > (y3 > y4 ? y3 : y4))
+            {
+                return false;
+            }
 
-            // 计算图像中心（像素坐标）
-            double imageCenterX = _originImage.PixelSize.Width / 2.0;
-            double imageCenterY = _originImage.PixelSize.Height / 2.0;
-
-            // 将像素坐标转换为相对于图像中心的坐标
-            Point relativePixelPos = new Point(
-                imagePixelPosition.X - imageCenterX,
-                imagePixelPosition.Y - imageCenterY
-            );
-
-            // 计算逆变换矩阵（从像素到机械）
-            double[] pixToMMMatrix = CalculateInverseTransform(m_9MMToPixMatrix);
-
-            // 将像素坐标转换为相对于视野中心的机械坐标
-            Point relativeMachPos = TransformPoint(relativePixelPos, pixToMMMatrix);
-
-            // 加上当前机械位置，得到绝对机械坐标
-            Point absoluteMachPos = new Point(
-                relativeMachPos.X + MotionMgr.Ins.CurrMachPos.X,
-                relativeMachPos.Y + MotionMgr.Ins.CurrMachPos.Y
-            );
-
-            return absoluteMachPos;
+            // 跨立实验
+            if ((((x1 - x3) * (y4 - y3) - (y1 - y3) * (x4 - x3)) *
+                 ((x2 - x3) * (y4 - y3) - (y2 - y3) * (x4 - x3))) > 0 ||
+                (((x3 - x1) * (y2 - y1) - (y3 - y1) * (x2 - x1)) *
+                 ((x4 - x1) * (y2 - y1) - (y4 - y1) * (x2 - x1))) > 0)
+            {
+                return false;
+            }
+            return true;
         }
+
+        /// <summary>
+        /// 判断线段是否在矩形可视区域内（线段裁剪算法简化版）
+        /// 只要线段的任意部分在矩形内，或者与矩形边相交，就返回 true
+        /// </summary>
+        private bool IsLineVisibleInRectangle(
+             double rectX, double rectY, double width, double height,
+             double lineStartX, double lineStartY,
+             double lineEndX, double lineEndY)
+        {
+            // 1. 两个端点都在矩形内 -> 可见
+            bool startIn = lineStartX >= rectX && lineStartX <= rectX + width &&
+                           lineStartY >= rectY && lineStartY <= rectY + height;
+            bool endIn = lineEndX >= rectX && lineEndX <= rectX + width &&
+                         lineEndY >= rectY && lineEndY <= rectY + height;
+            if (startIn || endIn) return true;
+
+            // 2. 两个端点都在矩形某一条边的外侧 -> 不可见 (快速排斥)
+            if (Math.Max(lineStartX, lineEndX) < rectX || Math.Min(lineStartX, lineEndX) > rectX + width ||
+                Math.Max(lineStartY, lineEndY) < rectY || Math.Min(lineStartY, lineEndY) > rectY + height)
+            {
+                return false;
+            }
+
+            // 3. 线段与矩形四条边相交 -> 可见
+            // 矩形四条边
+            // 上: (rectX, rectY) -> (rectX + width, rectY)
+            // 下: (rectX, rectY + height) -> (rectX + width, rectY + height)
+            // 左: (rectX, rectY) -> (rectX, rectY + height)
+            // 右: (rectX + width, rectY) -> (rectX + width, rectY + height)
+
+            if (LinesIntersect(lineStartX, lineStartY, lineEndX, lineEndY, rectX, rectY, rectX + width, rectY)) return true; // 上
+            if (LinesIntersect(lineStartX, lineStartY, lineEndX, lineEndY, rectX, rectY + height, rectX + width, rectY + height)) return true; // 下
+            if (LinesIntersect(lineStartX, lineStartY, lineEndX, lineEndY, rectX, rectY, rectX, rectY + height)) return true; // 左
+            if (LinesIntersect(lineStartX, lineStartY, lineEndX, lineEndY, rectX + width, rectY, rectX + width, rectY + height)) return true; // 右
+
+            return false;
+        }
+
+        #region Math Helpers
 
         /// <summary>
         /// 计算仿射变换矩阵（使用最小二乘法）
@@ -454,6 +524,7 @@ namespace AvaloniaVisionControl
 
             return new Point(transformedX, transformedY);
         }
+
+        #endregion
     }
 }
-
