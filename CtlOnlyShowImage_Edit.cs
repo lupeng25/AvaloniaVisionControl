@@ -29,42 +29,55 @@ namespace AvaloniaVisionControl
             RectBottomLeft,
             RectLeft,
             CircleCenter,
-            CircleRadiusPoint
+            CircleRadiusPoint,
+            LineStart,
+            LineEnd,
+            PolygonVertex
         }
 
         private readonly struct HandleHitResult
         {
-            public HandleHitResult(int elementIndex, ElementHandleType handleType)
+            public HandleHitResult(int elementIndex, ElementHandleType handleType, int vertexIndex = -1)
             {
                 ElementIndex = elementIndex;
                 HandleType = handleType;
+                VertexIndex = vertexIndex;
             }
 
             public int ElementIndex { get; }
 
             public ElementHandleType HandleType { get; }
+
+            public int VertexIndex { get; }
         }
 
         private readonly struct HandlePoint
         {
-            public HandlePoint(ElementHandleType handleType, Point position)
+            public HandlePoint(ElementHandleType handleType, Point position, int vertexIndex = -1)
             {
                 HandleType = handleType;
                 Position = position;
+                VertexIndex = vertexIndex;
             }
 
             public ElementHandleType HandleType { get; }
 
             public Point Position { get; }
+
+            public int VertexIndex { get; }
         }
 
         private EditInteractionMode _interactionMode = EditInteractionMode.None;
         private int _activeElementIndex = -1;
         private ElementHandleType _activeHandleType = ElementHandleType.None;
+        private int _activeHandleVertexIndex = -1;
         private Point _interactionPressPoint;
         private Point _interactionLastPoint;
         private bool _interactionMoved;
         private bool _suppressImageClickForCurrentPress;
+        private PaintElement? _interactionInitialElementSnapshot;
+        private PaintElement? _interactionLastPreviewElementSnapshot;
+        private bool _interactionElementChanged;
 
         private const double HandleDrawSize = 8.0;
         private const double HandleHitSize = 12.0;
@@ -95,34 +108,49 @@ namespace AvaloniaVisionControl
             _interactionLastPoint = mousePos;
             _interactionMoved = false;
             _suppressImageClickForCurrentPress = false;
+            _interactionElementChanged = false;
+            _interactionInitialElementSnapshot = null;
+            _interactionLastPreviewElementSnapshot = null;
 
             if (TryHitTestHandle(mousePos, out var handleHit))
             {
+                TrySetSelectedElementIndexInternal(handleHit.ElementIndex, PaintElementChangeSource.Interaction);
+
                 _interactionMode = EditInteractionMode.ResizingElement;
                 _activeElementIndex = handleHit.ElementIndex;
                 _activeHandleType = handleHit.HandleType;
+                _activeHandleVertexIndex = handleHit.VertexIndex;
                 _suppressImageClickForCurrentPress = true;
                 CtlMouseStatus = ImageCtlMouseStatus.Dragging;
                 Cursor = GetCursorForHandle(handleHit.HandleType);
+                _interactionInitialElementSnapshot = CloneElementAt(_activeElementIndex);
+                _interactionLastPreviewElementSnapshot = _interactionInitialElementSnapshot?.DeepCopy();
                 e.Pointer.Capture(this);
                 return;
             }
 
             if (TryHitTestElementBody(mousePos, out int bodyIndex))
             {
+                TrySetSelectedElementIndexInternal(bodyIndex, PaintElementChangeSource.Interaction);
+
                 _interactionMode = EditInteractionMode.MovingElement;
                 _activeElementIndex = bodyIndex;
                 _activeHandleType = ElementHandleType.None;
+                _activeHandleVertexIndex = -1;
                 _suppressImageClickForCurrentPress = true;
                 CtlMouseStatus = ImageCtlMouseStatus.Dragging;
                 Cursor = new Cursor(StandardCursorType.SizeAll);
+                _interactionInitialElementSnapshot = CloneElementAt(_activeElementIndex);
+                _interactionLastPreviewElementSnapshot = _interactionInitialElementSnapshot?.DeepCopy();
                 e.Pointer.Capture(this);
                 return;
             }
 
+            TrySetSelectedElementIndexInternal(-1, PaintElementChangeSource.Interaction);
             _interactionMode = EditInteractionMode.PanningImage;
             _activeElementIndex = -1;
             _activeHandleType = ElementHandleType.None;
+            _activeHandleVertexIndex = -1;
             CtlMouseStatus = ImageCtlMouseStatus.Dragging;
             Cursor = new Cursor(StandardCursorType.Hand);
             e.Pointer.Capture(this);
@@ -178,6 +206,7 @@ namespace AvaloniaVisionControl
             _interactionLastPoint = mousePos;
             if (changed)
             {
+                RaiseInteractionPreviewChanged();
                 InvalidateVisual();
             }
         }
@@ -206,6 +235,8 @@ namespace AvaloniaVisionControl
                 var imagePos = ClampPointToImage(ControlToImagePoint(mousePos));
                 ImageClick?.Invoke(this, new ImageClickEventArgs(mousePos, imagePos));
             }
+
+            RaiseInteractionCommittedChanged();
 
             ResetInteractionState();
             UpdateCursorStyle(mousePos);
@@ -262,28 +293,42 @@ namespace AvaloniaVisionControl
                 ElementHandleType.RectRight => new Cursor(StandardCursorType.RightSide),
                 ElementHandleType.CircleCenter => new Cursor(StandardCursorType.SizeAll),
                 ElementHandleType.CircleRadiusPoint => new Cursor(StandardCursorType.Hand),
+                ElementHandleType.LineStart => new Cursor(StandardCursorType.Hand),
+                ElementHandleType.LineEnd => new Cursor(StandardCursorType.Hand),
+                ElementHandleType.PolygonVertex => new Cursor(StandardCursorType.Hand),
                 _ => Cursor.Default
             };
         }
 
         private bool TryHitTestHandle(Point mousePosition, out HandleHitResult hitResult)
         {
-            for (int i = m_CurrShowElement.Count - 1; i >= 0; i--)
+            if (_selectedElementIndex < 0 || _selectedElementIndex >= m_CurrShowElement.Count)
             {
-                var element = m_CurrShowElement[i];
-                if (!IsEditableElement(element))
-                {
-                    continue;
-                }
+                hitResult = default;
+                return false;
+            }
 
-                var handles = GetHandlePoints(element);
-                foreach (var handle in handles)
+            int i = _selectedElementIndex;
+            if (!ShouldRenderElement(i))
+            {
+                hitResult = default;
+                return false;
+            }
+
+            var element = m_CurrShowElement[i];
+            if (!IsEditableElement(element))
+            {
+                hitResult = default;
+                return false;
+            }
+
+            var handles = GetHandlePoints(element);
+            foreach (var handle in handles)
+            {
+                if (GetHandleRect(handle.Position, HandleHitSize).Contains(mousePosition))
                 {
-                    if (GetHandleRect(handle.Position, HandleHitSize).Contains(mousePosition))
-                    {
-                        hitResult = new HandleHitResult(i, handle.HandleType);
-                        return true;
-                    }
+                    hitResult = new HandleHitResult(i, handle.HandleType, handle.VertexIndex);
+                    return true;
                 }
             }
 
@@ -295,6 +340,11 @@ namespace AvaloniaVisionControl
         {
             for (int i = m_CurrShowElement.Count - 1; i >= 0; i--)
             {
+                if (!ShouldRenderElement(i))
+                {
+                    continue;
+                }
+
                 var element = m_CurrShowElement[i];
                 if (!IsEditableElement(element))
                 {
@@ -319,6 +369,25 @@ namespace AvaloniaVisionControl
                     double dy = mousePosition.Y - center.Y;
                     double distance = Math.Sqrt(dx * dx + dy * dy);
                     if (distance <= radius + ElementHitTolerance)
+                    {
+                        elementIndex = i;
+                        return true;
+                    }
+                }
+                else if (element.Type == PaintElementType.Line &&
+                         TryGetLineControlGeometry(element, out var lineStart, out var lineEnd))
+                {
+                    if (DistanceToSegment(mousePosition, lineStart, lineEnd) <= ElementHitTolerance)
+                    {
+                        elementIndex = i;
+                        return true;
+                    }
+                }
+                else if (element.Type == PaintElementType.Polygon &&
+                         TryGetPolygonControlPoints(element, out var polygonPoints))
+                {
+                    if (IsPointInPolygon(mousePosition, polygonPoints) ||
+                        IsPointNearPolygonEdge(mousePosition, polygonPoints, ElementHitTolerance))
                     {
                         elementIndex = i;
                         return true;
@@ -367,6 +436,16 @@ namespace AvaloniaVisionControl
                     deltaImageX,
                     deltaImageY,
                     pixelToMachineMatrix),
+                PaintElementType.Line => TryMoveLineElement(
+                    element,
+                    deltaImageX,
+                    deltaImageY,
+                    pixelToMachineMatrix),
+                PaintElementType.Polygon => TryMovePolygonElement(
+                    element,
+                    deltaImageX,
+                    deltaImageY,
+                    pixelToMachineMatrix),
                 _ => false
             };
         }
@@ -410,6 +489,18 @@ namespace AvaloniaVisionControl
                     deltaImageX,
                     deltaImageY,
                     pixelToMachineMatrix);
+            }
+
+            if (element.Type == PaintElementType.Line &&
+                (_activeHandleType == ElementHandleType.LineStart || _activeHandleType == ElementHandleType.LineEnd))
+            {
+                return TryResizeLineElement(element, mousePosition, pixelToMachineMatrix);
+            }
+
+            if (element.Type == PaintElementType.Polygon &&
+                _activeHandleType == ElementHandleType.PolygonVertex)
+            {
+                return TryResizePolygonVertex(element, mousePosition, _activeHandleVertexIndex, pixelToMachineMatrix);
             }
 
             return false;
@@ -470,6 +561,78 @@ namespace AvaloniaVisionControl
             var centerNew = new Point(centerImage.X + moveX, centerImage.Y + moveY);
             var edgeNew = new Point(edgeImage.X + moveX, edgeImage.Y + moveY);
             return TrySetCircleFromImagePoints(element, centerNew, edgeNew, pixelToMachineMatrix);
+        }
+
+        private bool TryMoveLineElement(
+            PaintElement element,
+            double deltaImageX,
+            double deltaImageY,
+            double[] pixelToMachineMatrix)
+        {
+            if (!TryGetLineImageGeometry(element, out var startImage, out var endImage))
+            {
+                return false;
+            }
+
+            double imageWidth = _originImage.PixelSize.Width;
+            double imageHeight = _originImage.PixelSize.Height;
+            double minX = Math.Min(startImage.X, endImage.X);
+            double maxX = Math.Max(startImage.X, endImage.X);
+            double minY = Math.Min(startImage.Y, endImage.Y);
+            double maxY = Math.Max(startImage.Y, endImage.Y);
+
+            double moveX = Math.Clamp(deltaImageX, -minX, imageWidth - maxX);
+            double moveY = Math.Clamp(deltaImageY, -minY, imageHeight - maxY);
+            if (Math.Abs(moveX) < double.Epsilon && Math.Abs(moveY) < double.Epsilon)
+            {
+                return false;
+            }
+
+            var startNew = new Point(startImage.X + moveX, startImage.Y + moveY);
+            var endNew = new Point(endImage.X + moveX, endImage.Y + moveY);
+            return TrySetLineFromImagePoints(element, startNew, endNew, pixelToMachineMatrix);
+        }
+
+        private bool TryMovePolygonElement(
+            PaintElement element,
+            double deltaImageX,
+            double deltaImageY,
+            double[] pixelToMachineMatrix)
+        {
+            if (!TryGetPolygonImagePoints(element, out var imagePoints) || imagePoints.Count < 3)
+            {
+                return false;
+            }
+
+            double imageWidth = _originImage.PixelSize.Width;
+            double imageHeight = _originImage.PixelSize.Height;
+
+            double minX = double.MaxValue;
+            double maxX = double.MinValue;
+            double minY = double.MaxValue;
+            double maxY = double.MinValue;
+            foreach (var point in imagePoints)
+            {
+                minX = Math.Min(minX, point.X);
+                maxX = Math.Max(maxX, point.X);
+                minY = Math.Min(minY, point.Y);
+                maxY = Math.Max(maxY, point.Y);
+            }
+
+            double moveX = Math.Clamp(deltaImageX, -minX, imageWidth - maxX);
+            double moveY = Math.Clamp(deltaImageY, -minY, imageHeight - maxY);
+            if (Math.Abs(moveX) < double.Epsilon && Math.Abs(moveY) < double.Epsilon)
+            {
+                return false;
+            }
+
+            var moved = new List<Point>(imagePoints.Count);
+            foreach (var point in imagePoints)
+            {
+                moved.Add(new Point(point.X + moveX, point.Y + moveY));
+            }
+
+            return TrySetPolygonFromImagePoints(element, moved, pixelToMachineMatrix);
         }
 
         private bool TryResizeRectangleElement(
@@ -663,6 +826,66 @@ namespace AvaloniaVisionControl
             return TrySetCircleFromImagePoints(element, centerImage, newEdgeImage, pixelToMachineMatrix);
         }
 
+        private bool TryResizeLineElement(
+            PaintElement element,
+            Point mousePosition,
+            double[] pixelToMachineMatrix)
+        {
+            if (!TryGetLineImageGeometry(element, out var startImage, out var endImage))
+            {
+                return false;
+            }
+
+            var targetImage = ClampPointToImage(ControlToImagePoint(mousePosition));
+            if (_activeHandleType == ElementHandleType.LineStart)
+            {
+                if (Distance(targetImage, startImage) < double.Epsilon)
+                {
+                    return false;
+                }
+
+                return TrySetLineFromImagePoints(element, targetImage, endImage, pixelToMachineMatrix);
+            }
+
+            if (_activeHandleType == ElementHandleType.LineEnd)
+            {
+                if (Distance(targetImage, endImage) < double.Epsilon)
+                {
+                    return false;
+                }
+
+                return TrySetLineFromImagePoints(element, startImage, targetImage, pixelToMachineMatrix);
+            }
+
+            return false;
+        }
+
+        private bool TryResizePolygonVertex(
+            PaintElement element,
+            Point mousePosition,
+            int vertexIndex,
+            double[] pixelToMachineMatrix)
+        {
+            if (!TryGetPolygonImagePoints(element, out var imagePoints))
+            {
+                return false;
+            }
+
+            if (vertexIndex < 0 || vertexIndex >= imagePoints.Count)
+            {
+                return false;
+            }
+
+            var targetImage = ClampPointToImage(ControlToImagePoint(mousePosition));
+            if (Distance(targetImage, imagePoints[vertexIndex]) < double.Epsilon)
+            {
+                return false;
+            }
+
+            imagePoints[vertexIndex] = targetImage;
+            return TrySetPolygonFromImagePoints(element, imagePoints, pixelToMachineMatrix);
+        }
+
         private bool TrySetRectangleFromImagePoints(
             PaintElement element,
             Point p1Image,
@@ -694,6 +917,45 @@ namespace AvaloniaVisionControl
             element.Pts[1] = centerMachine.Y;
             element.Pts[2] = edgeMachine.X;
             element.Pts[3] = edgeMachine.Y;
+            return true;
+        }
+
+        private bool TrySetLineFromImagePoints(
+            PaintElement element,
+            Point startImage,
+            Point endImage,
+            double[] pixelToMachineMatrix)
+        {
+            var startMachine = ImageToMachinePoint(startImage, pixelToMachineMatrix);
+            var endMachine = ImageToMachinePoint(endImage, pixelToMachineMatrix);
+
+            EnsureElementPointCount(element, 4);
+            element.Pts[0] = startMachine.X;
+            element.Pts[1] = startMachine.Y;
+            element.Pts[2] = endMachine.X;
+            element.Pts[3] = endMachine.Y;
+            return true;
+        }
+
+        private bool TrySetPolygonFromImagePoints(
+            PaintElement element,
+            List<Point> imagePoints,
+            double[] pixelToMachineMatrix)
+        {
+            if (imagePoints.Count < 3)
+            {
+                return false;
+            }
+
+            var newPts = new List<double>(imagePoints.Count * 2);
+            foreach (var imagePoint in imagePoints)
+            {
+                var machinePoint = ImageToMachinePoint(imagePoint, pixelToMachineMatrix);
+                newPts.Add(machinePoint.X);
+                newPts.Add(machinePoint.Y);
+            }
+
+            element.Pts = newPts;
             return true;
         }
 
@@ -773,6 +1035,68 @@ namespace AvaloniaVisionControl
             return true;
         }
 
+        private bool TryGetLineControlGeometry(PaintElement element, out Point start, out Point end)
+        {
+            start = default;
+            end = default;
+            if (element.Type != PaintElementType.Line || element.Pts.Count < 4)
+            {
+                return false;
+            }
+
+            start = MachineToControlPoint(new Point(element.Pts[0], element.Pts[1]));
+            end = MachineToControlPoint(new Point(element.Pts[2], element.Pts[3]));
+            return true;
+        }
+
+        private bool TryGetLineImageGeometry(PaintElement element, out Point startImage, out Point endImage)
+        {
+            startImage = default;
+            endImage = default;
+            if (element.Type != PaintElementType.Line || element.Pts.Count < 4)
+            {
+                return false;
+            }
+
+            startImage = MachineToImagePoint(new Point(element.Pts[0], element.Pts[1]));
+            endImage = MachineToImagePoint(new Point(element.Pts[2], element.Pts[3]));
+            return true;
+        }
+
+        private bool TryGetPolygonControlPoints(PaintElement element, out List<Point> points)
+        {
+            points = new List<Point>();
+            if (element.Type != PaintElementType.Polygon || element.Pts.Count < 6 || element.Pts.Count % 2 != 0)
+            {
+                return false;
+            }
+
+            for (int i = 0; i < element.Pts.Count; i += 2)
+            {
+                var machinePoint = new Point(element.Pts[i], element.Pts[i + 1]);
+                points.Add(MachineToControlPoint(machinePoint));
+            }
+
+            return points.Count >= 3;
+        }
+
+        private bool TryGetPolygonImagePoints(PaintElement element, out List<Point> points)
+        {
+            points = new List<Point>();
+            if (element.Type != PaintElementType.Polygon || element.Pts.Count < 6 || element.Pts.Count % 2 != 0)
+            {
+                return false;
+            }
+
+            for (int i = 0; i < element.Pts.Count; i += 2)
+            {
+                var machinePoint = new Point(element.Pts[i], element.Pts[i + 1]);
+                points.Add(MachineToImagePoint(machinePoint));
+            }
+
+            return points.Count >= 3;
+        }
+
         private List<HandlePoint> GetHandlePoints(PaintElement element)
         {
             var handlePoints = new List<HandlePoint>();
@@ -801,6 +1125,20 @@ namespace AvaloniaVisionControl
                 handlePoints.Add(new HandlePoint(ElementHandleType.CircleCenter, center));
                 handlePoints.Add(new HandlePoint(ElementHandleType.CircleRadiusPoint, edge));
             }
+            else if (element.Type == PaintElementType.Line &&
+                     TryGetLineControlGeometry(element, out var start, out var end))
+            {
+                handlePoints.Add(new HandlePoint(ElementHandleType.LineStart, start));
+                handlePoints.Add(new HandlePoint(ElementHandleType.LineEnd, end));
+            }
+            else if (element.Type == PaintElementType.Polygon &&
+                     TryGetPolygonControlPoints(element, out var polygonPoints))
+            {
+                for (int i = 0; i < polygonPoints.Count; i++)
+                {
+                    handlePoints.Add(new HandlePoint(ElementHandleType.PolygonVertex, polygonPoints[i], i));
+                }
+            }
 
             return handlePoints;
         }
@@ -822,21 +1160,21 @@ namespace AvaloniaVisionControl
         {
             return element.Visible &&
                    element.Pts.Count >= 4 &&
-                   (element.Type == PaintElementType.Rectangle || element.Type == PaintElementType.Circle);
+                   element.Type switch
+                   {
+                       PaintElementType.Rectangle => element.Pts.Count >= 4,
+                       PaintElementType.Circle => element.Pts.Count >= 4,
+                       PaintElementType.Line => element.Pts.Count >= 4,
+                       PaintElementType.Polygon => element.Pts.Count >= 6 && element.Pts.Count % 2 == 0,
+                       _ => false
+                   };
         }
 
         private bool TryGetPixelToMachineMatrix(out double[] pixelToMachineMatrix)
         {
-            try
-            {
-                pixelToMachineMatrix = CalculateInverseTransform(m_9MMToPixMatrix);
-                return true;
-            }
-            catch
-            {
-                pixelToMachineMatrix = Array.Empty<double>();
-                return false;
-            }
+            // Pure image mode: element points are already in image pixels.
+            pixelToMachineMatrix = new double[9] { 1, 0, 0, 0, 1, 0, 0, 0, 1 };
+            return true;
         }
 
         private Point ControlToImagePoint(Point controlPoint)
@@ -855,9 +1193,7 @@ namespace AvaloniaVisionControl
 
         private Point MachineToImagePoint(Point machinePoint)
         {
-            var machPos = MotionMgr.Ins.CurrMachPos;
-            var relativePoint = new Point(machinePoint.X - machPos.X, machinePoint.Y - machPos.Y);
-            return TransformPoint(relativePoint, m_9MMToPixMatrix);
+            return machinePoint;
         }
 
         private Point MachineToControlPoint(Point machinePoint)
@@ -867,9 +1203,8 @@ namespace AvaloniaVisionControl
 
         private Point ImageToMachinePoint(Point imagePoint, double[] pixelToMachineMatrix)
         {
-            var relativeMachinePoint = TransformPoint(imagePoint, pixelToMachineMatrix);
-            var machPos = MotionMgr.Ins.CurrMachPos;
-            return new Point(relativeMachinePoint.X + machPos.X, relativeMachinePoint.Y + machPos.Y);
+            _ = pixelToMachineMatrix;
+            return imagePoint;
         }
 
         private Point ClampPointToImage(Point imagePoint)
@@ -924,21 +1259,29 @@ namespace AvaloniaVisionControl
                 return;
             }
 
-            foreach (var element in m_CurrShowElement)
+            if (_selectedElementIndex < 0 || _selectedElementIndex >= m_CurrShowElement.Count)
             {
-                if (!IsEditableElement(element))
-                {
-                    continue;
-                }
+                return;
+            }
 
-                var handles = GetHandlePoints(element);
-                foreach (var handle in handles)
-                {
-                    context.DrawRectangle(
-                        HandleFillBrush,
-                        HandleBorderPen,
-                        GetHandleRect(handle.Position, HandleDrawSize));
-                }
+            if (!ShouldRenderElement(_selectedElementIndex))
+            {
+                return;
+            }
+
+            var element = m_CurrShowElement[_selectedElementIndex];
+            if (!IsEditableElement(element))
+            {
+                return;
+            }
+
+            var handles = GetHandlePoints(element);
+            foreach (var handle in handles)
+            {
+                context.DrawRectangle(
+                    HandleFillBrush,
+                    HandleBorderPen,
+                    GetHandleRect(handle.Position, HandleDrawSize));
             }
         }
 
@@ -947,9 +1290,161 @@ namespace AvaloniaVisionControl
             _interactionMode = EditInteractionMode.None;
             _activeElementIndex = -1;
             _activeHandleType = ElementHandleType.None;
+            _activeHandleVertexIndex = -1;
             _interactionMoved = false;
             _suppressImageClickForCurrentPress = false;
+            _interactionInitialElementSnapshot = null;
+            _interactionLastPreviewElementSnapshot = null;
+            _interactionElementChanged = false;
             CtlMouseStatus = ImageCtlMouseStatus.Normal;
+        }
+
+        private void RaiseInteractionPreviewChanged()
+        {
+            if (_interactionMode != EditInteractionMode.MovingElement &&
+                _interactionMode != EditInteractionMode.ResizingElement)
+            {
+                return;
+            }
+
+            if (!IsIndexValid(_activeElementIndex))
+            {
+                return;
+            }
+
+            var current = CloneElementAt(_activeElementIndex);
+            if (current == null)
+            {
+                return;
+            }
+
+            if (_interactionLastPreviewElementSnapshot != null &&
+                AreElementsEquivalent(_interactionLastPreviewElementSnapshot, current))
+            {
+                return;
+            }
+
+            RaiseElementChanged(
+                PaintElementChangeAction.Updated,
+                _activeElementIndex,
+                _interactionLastPreviewElementSnapshot,
+                current,
+                PaintElementChangeSource.Interaction,
+                PaintElementChangePhase.Preview);
+
+            _interactionLastPreviewElementSnapshot = current.DeepCopy();
+            _interactionElementChanged = true;
+        }
+
+        private void RaiseInteractionCommittedChanged()
+        {
+            if (!_interactionElementChanged)
+            {
+                return;
+            }
+
+            if (!IsIndexValid(_activeElementIndex))
+            {
+                return;
+            }
+
+            var current = CloneElementAt(_activeElementIndex);
+            if (current == null || _interactionInitialElementSnapshot == null)
+            {
+                return;
+            }
+
+            if (AreElementsEquivalent(_interactionInitialElementSnapshot, current))
+            {
+                return;
+            }
+
+            RaiseElementChanged(
+                PaintElementChangeAction.Updated,
+                _activeElementIndex,
+                _interactionInitialElementSnapshot,
+                current,
+                PaintElementChangeSource.Interaction,
+                PaintElementChangePhase.Committed);
+        }
+
+        private static bool AreElementsEquivalent(PaintElement left, PaintElement right)
+        {
+            if (left.Type != right.Type ||
+                left.LineWidth != right.LineWidth ||
+                left.Color != right.Color ||
+                left.IsFill != right.IsFill ||
+                left.Text != right.Text ||
+                left.FontSize != right.FontSize ||
+                left.Visible != right.Visible ||
+                left.Pts.Count != right.Pts.Count)
+            {
+                return false;
+            }
+
+            for (int i = 0; i < left.Pts.Count; i++)
+            {
+                if (Math.Abs(left.Pts[i] - right.Pts[i]) > double.Epsilon)
+                {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        private static double DistanceToSegment(Point point, Point segmentStart, Point segmentEnd)
+        {
+            double dx = segmentEnd.X - segmentStart.X;
+            double dy = segmentEnd.Y - segmentStart.Y;
+            if (Math.Abs(dx) < double.Epsilon && Math.Abs(dy) < double.Epsilon)
+            {
+                return Distance(point, segmentStart);
+            }
+
+            double t = ((point.X - segmentStart.X) * dx + (point.Y - segmentStart.Y) * dy) /
+                       (dx * dx + dy * dy);
+            t = Math.Clamp(t, 0, 1);
+            var projection = new Point(segmentStart.X + t * dx, segmentStart.Y + t * dy);
+            return Distance(point, projection);
+        }
+
+        private static bool IsPointInPolygon(Point point, List<Point> polygon)
+        {
+            bool inside = false;
+            for (int i = 0, j = polygon.Count - 1; i < polygon.Count; j = i++)
+            {
+                var pi = polygon[i];
+                var pj = polygon[j];
+                bool intersects = (pi.Y > point.Y) != (pj.Y > point.Y) &&
+                                  point.X < (pj.X - pi.X) * (point.Y - pi.Y) / (pj.Y - pi.Y + double.Epsilon) + pi.X;
+                if (intersects)
+                {
+                    inside = !inside;
+                }
+            }
+
+            return inside;
+        }
+
+        private static bool IsPointNearPolygonEdge(Point point, List<Point> polygon, double tolerance)
+        {
+            if (polygon.Count < 2)
+            {
+                return false;
+            }
+
+            for (int i = 0; i < polygon.Count; i++)
+            {
+                var start = polygon[i];
+                var end = polygon[(i + 1) % polygon.Count];
+                if (DistanceToSegment(point, start, end) <= tolerance)
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
     }
 }

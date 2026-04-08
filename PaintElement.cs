@@ -16,7 +16,7 @@ namespace AvaloniaVisionControl
         public PaintElementType Type { get; set; }
 
         /// <summary>
-        /// 坐标点列表（机械坐标，单位：mm）
+        /// 坐标点列表（图像像素坐标）
         /// 格式：[x1, y1, x2, y2, ...]
         /// </summary>
         public List<double> Pts { get; set; }
@@ -60,6 +60,24 @@ namespace AvaloniaVisionControl
             Visible = true;
             FontSize = 12;
             Text = string.Empty;
+        }
+
+        /// <summary>
+        /// 创建当前图元的深拷贝。
+        /// </summary>
+        public PaintElement DeepCopy()
+        {
+            return new PaintElement
+            {
+                Type = Type,
+                Pts = new List<double>(Pts),
+                LineWidth = LineWidth,
+                Color = Color,
+                IsFill = IsFill,
+                Text = Text,
+                FontSize = FontSize,
+                Visible = Visible
+            };
         }
 
         /// <summary>

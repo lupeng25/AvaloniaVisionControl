@@ -12,7 +12,7 @@ namespace AvaloniaVisionControl
     /// Avalonia 版图像显示控件
     /// 支持图像显示、鼠标缩放拖拽、图元叠加显示
     /// </summary>
-    public partial class CtlOnlyShowImage : Control, IShowPaintElement
+    public partial class CtlOnlyShowImage : Control, IShowPaintElement, IEditablePaintElement
     {
         private Bitmap _originImage;
         private double _currentZoomFactor = 1.0;
@@ -35,9 +35,11 @@ namespace AvaloniaVisionControl
 
         /// <summary>
         /// 鼠标左键单击事件
-        /// 当用户在图像上单击鼠标左键时触发，用于控制机械手移动
+        /// 当用户在图像上单击鼠标左键时触发，返回控件坐标与图像像素坐标
         /// </summary>
         public event EventHandler<ImageClickEventArgs> ImageClick;
+
+        public event EventHandler<PaintElementChangedEventArgs>? ElementChanged;
 
         public CtlOnlyShowImage(params int[] camIndex)
         {
@@ -48,20 +50,12 @@ namespace AvaloniaVisionControl
             
             // 订阅双击事件
             DoubleTapped += OnDoubleTapped;
-            
-            // 订阅运动位置改变事件
-            MotionMgr.Ins.CurrMachPosChanged += CurrMachPosChanged;
         }
 
         /// <summary>
         /// 无参数构造函数（用于 XAML）
         /// </summary>
         public CtlOnlyShowImage() : this(0) { }
-
-        private void CurrMachPosChanged(object sender, EventArgs e)
-        {
-            InvalidateVisual();
-        }
 
         protected override void OnPointerWheelChanged(PointerWheelEventArgs e)
         {
@@ -206,8 +200,14 @@ namespace AvaloniaVisionControl
             if (m_CurrShowElement.Count > 0 && CtlShowPaintStatus > 0)
             {
                 var imageRect = GetImageRectangle();
-                foreach (var element in m_CurrShowElement)
+                for (int i = 0; i < m_CurrShowElement.Count; i++)
                 {
+                    if (!ShouldRenderElement(i))
+                    {
+                        continue;
+                    }
+
+                    var element = m_CurrShowElement[i];
                     var newPt = GetTransedPts(element.Pts, element.Type, imageRect);
                     if (newPt.Count > 0)
                         element.Paint(context, m_lineWidthScale * _currentZoomFactor, newPt);
@@ -292,7 +292,6 @@ namespace AvaloniaVisionControl
             
             // 取消订阅事件
             DoubleTapped -= OnDoubleTapped;
-            MotionMgr.Ins.CurrMachPosChanged -= CurrMachPosChanged;
             
             // 释放资源
             _originImage?.Dispose();

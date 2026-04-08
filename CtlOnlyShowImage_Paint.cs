@@ -11,9 +11,9 @@ namespace AvaloniaVisionControl
     public partial class CtlOnlyShowImage
     {
         /// <summary>
-        /// 机械坐标到像素坐标的仿射变换矩阵（3×3，存储为 9 元素数组）
+        /// 兼容保留的变换矩阵字段（当前纯图像模式下固定为单位矩阵）
         /// </summary>
-        private double[] m_9MMToPixMatrix = new double[9];
+        private double[] m_9MMToPixMatrix = new double[9] { 1, 0, 0, 0, 1, 0, 0, 0, 1 };
 
         /// <summary>
         /// 当前需要显示的图元列表
@@ -21,81 +21,73 @@ namespace AvaloniaVisionControl
         private List<PaintElement> m_CurrShowElement = new List<PaintElement>();
 
         /// <summary>
-        /// 线宽缩放比例（根据仿射变换计算）
+        /// 线宽缩放比例（纯图像模式固定为 1）
         /// </summary>
         private double m_lineWidthScale = 1;
 
+        private int _selectedElementIndex = -1;
+
+        private const int SuccessCode = 0;
+        private const int InvalidParameterCode = -1;
+        private const int OutOfRangeCode = -2;
+        private const int InvalidStateCode = -3;
+
         /// <summary>
-        /// 将机械坐标转换为控件坐标
+        /// 将图像像素坐标转换为控件坐标
         /// </summary>
-        /// <param name="originData">原始机械坐标列表 [x1, y1, x2, y2, ...]</param>
+        /// <param name="originData">原始图像像素坐标列表 [x1, y1, x2, y2, ...]</param>
         /// <param name="type">图元类型</param>
         /// <param name="imageRect">图像在控件中的矩形区域</param>
         /// <returns>转换后的控件坐标列表</returns>
         protected List<float> GetTransedPts(List<double> originData, PaintElementType type, Rect imageRect)
         {
-            var ptList = new List<Point>();
-            
-            // 将坐标转换为 Point 列表
-            double tempV = 0;
-            for (int i = 0; i < originData.Count; i++)
-            {
-                if (i % 2 == 1)
-                {
-                    ptList.Add(new Point(tempV, originData[i]));
-                }
-                else
-                {
-                    tempV = originData[i];
-                }
-            }
+            var result = new List<float>();
+            bool isVisible = false;
 
-            bool IsInImageRect = false; // 指示是否有任何点在视野范围内
-            var newPt = new List<Point>();
-            var machPos = MotionMgr.Ins.CurrMachPos;
-
-            for (int i = 0; i < ptList.Count; i++)
+            for (int i = 0; i + 1 < originData.Count; i += 2)
             {
-                // 转换为相对于视野中心坐标系的坐标
-                Point machV = new Point(ptList[i].X - machPos.X, ptList[i].Y - machPos.Y);
-                
-                // 使用仿射变换矩阵转成图像坐标
-                Point pixV = TransformPoint(machV, m_9MMToPixMatrix);
-                
-                // 图像坐标转控件坐标
-                Point ctlV = new Point(
-                    pixV.X * _currentZoomFactor + _scrollImageLocation.X,
-                    pixV.Y * _currentZoomFactor + _scrollImageLocation.Y
+                double imageX = originData[i];
+                double imageY = originData[i + 1];
+
+                var ctlV = new Point(
+                    imageX * _currentZoomFactor + _scrollImageLocation.X,
+                    imageY * _currentZoomFactor + _scrollImageLocation.Y
                 );
 
-                // 判断点是否在可见区域内
                 if (type == PaintElementType.Line || type == PaintElementType.Text)
                 {
-                    IsInImageRect = true;
+                    isVisible = true;
                 }
-                else if (!IsInImageRect)
+                else if (!isVisible)
                 {
                     if (ctlV.X >= 0 && ctlV.Y >= 0 &&
                         ctlV.X <= Bounds.Width && ctlV.Y <= Bounds.Height)
                     {
-                        IsInImageRect = true;
+                        isVisible = true;
                     }
                 }
-                newPt.Add(ctlV);
+
+                result.Add((float)ctlV.X);
+                result.Add((float)ctlV.Y);
             }
 
-            if (IsInImageRect)
+            return isVisible ? result : new List<float>();
+        }
+
+        private bool ShouldRenderElement(int index)
+        {
+            if (index < 0 || index >= m_CurrShowElement.Count)
             {
-                var list = new List<float>();
-                foreach (var pt in newPt)
-                {
-                    list.Add((float)pt.X);
-                    list.Add((float)pt.Y);
-                }
-                return list;
+                return false;
             }
-            else
-                return new List<float>();
+
+            return CtlShowPaintStatus switch
+            {
+                ImageElementCtlStatus.None => false,
+                ImageElementCtlStatus.ShowAll => true,
+                ImageElementCtlStatus.ShowSelected => index == _selectedElementIndex,
+                _ => CtlShowPaintStatus > 0
+            };
         }
 
         /// <summary>
@@ -113,83 +105,58 @@ namespace AvaloniaVisionControl
         /// </summary>
         private void CalcLineWidthScale()
         {
-            var zero = TransformPoint(new Point(0, 0), m_9MMToPixMatrix);
-            var pt1 = TransformPoint(new Point(1, 0), m_9MMToPixMatrix);
-            var xOffset = zero.X - pt1.X;
-            var yOffset = zero.Y - pt1.Y;
-            m_lineWidthScale = Math.Sqrt(xOffset * xOffset + yOffset * yOffset);
+            m_lineWidthScale = 1;
         }
 
         /// <summary>
-        /// 设置相机标定参数（通过文件路径）
+        /// 兼容旧版本：设置相机标定参数（当前纯图像模式下无实际作用）
         /// </summary>
         public int SetCameraCalib(string calibFilePath)
         {
-            // TODO: 实现从文件加载标定参数
+            // 纯图像模式：为兼容旧 API 保留该方法
             return 0;
         }
 
         /// <summary>
-        /// 设置相机标定参数（像素到机械坐标的变换矩阵）
+        /// 兼容旧版本：设置相机标定参数（当前纯图像模式下无实际作用）
         /// </summary>
         public int SetCameraCalib(double[] matrixPixToMM)
         {
-            m_9MMToPixMatrix = CalculateInverseTransform(matrixPixToMM);
+            // 纯图像模式：为兼容旧 API 保留该方法
+            m_9MMToPixMatrix = new double[9] { 1, 0, 0, 0, 1, 0, 0, 0, 1 };
             CalcLineWidthScale();
             return 0;
         }
 
         /// <summary>
-        /// 设置相机标定参数（机械坐标到像素的变换矩阵）
+        /// 兼容旧版本：设置相机标定参数（当前纯图像模式下无实际作用）
         /// </summary>
         public int SetCameraCalibRef(double[] matrixMMToPix)
         {
-            m_9MMToPixMatrix = matrixMMToPix;
+            // 纯图像模式：为兼容旧 API 保留该方法
+            m_9MMToPixMatrix = new double[9] { 1, 0, 0, 0, 1, 0, 0, 0, 1 };
             CalcLineWidthScale();
             return 0;
         }
 
         /// <summary>
-        /// 简化版标定：只有 X、Y 像素当量
+        /// 兼容旧版本：简化标定参数（当前纯图像模式下无实际作用）
         /// </summary>
-        /// <param name="MMpix">像素当量（若为 0.5，则 1pix=0.5mm）</param>
+        /// <param name="MMpix">历史参数，当前不使用</param>
         /// <param name="imgWidth">图像宽度</param>
         /// <param name="imgHeight">图像高度</param>
         public int SetCameraCalib(Point MMpix, int imgWidth, int imgHeight)
         {
-            // 计算仿射变换矩阵
-            List<Point> mmPoints = new List<Point>();
-            List<Point> pixPoints = new List<Point>();
-            int halfX = imgWidth / 2;
-            int halfY = imgHeight / 2;
-
-            mmPoints.Add(new Point(-1, 1));
-            pixPoints.Add(new Point(halfX - 1.0 / MMpix.X, halfY - 1.0 / MMpix.Y));
-            mmPoints.Add(new Point(0, 1));
-            pixPoints.Add(new Point(halfX, halfY - 1.0 / MMpix.Y));
-            mmPoints.Add(new Point(1, 1));
-            pixPoints.Add(new Point(halfX + 1.0 / MMpix.X, halfY - 1.0 / MMpix.Y));
-            mmPoints.Add(new Point(-1, 0));
-            pixPoints.Add(new Point(halfX - 1.0 / MMpix.X, halfY));
-            mmPoints.Add(new Point(0, 0));
-            pixPoints.Add(new Point(halfX, halfY));
-            mmPoints.Add(new Point(1, 0));
-            pixPoints.Add(new Point(halfX + 1.0 / MMpix.X, halfY));
-            mmPoints.Add(new Point(-1, -1));
-            pixPoints.Add(new Point(halfX - 1.0 / MMpix.X, halfY + 1.0 / MMpix.Y));
-            mmPoints.Add(new Point(0, -1));
-            pixPoints.Add(new Point(halfX, halfY + 1.0 / MMpix.Y));
-            mmPoints.Add(new Point(1, -1));
-            pixPoints.Add(new Point(halfX + 1.0 / MMpix.X, halfY + 1.0 / MMpix.Y));
-
-            int ret = CalculateAffineTransformMatrix(mmPoints, pixPoints, out m_9MMToPixMatrix);
+            // 纯图像模式：为兼容旧 API 保留该方法
+            m_9MMToPixMatrix = new double[9] { 1, 0, 0, 0, 1, 0, 0, 0, 1 };
             CalcLineWidthScale();
-            return ret;
+            return 0;
         }
 
         public int SetUpdateCameraPos(Func<Point> getPosFunc)
         {
-            throw new NotImplementedException();
+            // 纯图像模式：无需外部更新运控位置
+            return SuccessCode;
         }
 
         /// <summary>
@@ -197,8 +164,44 @@ namespace AvaloniaVisionControl
         /// </summary>
         public int SetPaintElements(List<PaintElement> needShowElement)
         {
-            m_CurrShowElement = needShowElement;
-            return 0;
+            if (needShowElement == null)
+            {
+                return InvalidParameterCode;
+            }
+
+            var newElements = new List<PaintElement>(needShowElement.Count);
+            foreach (var element in needShowElement)
+            {
+                if (!TryCloneValidElement(element, out var clone))
+                {
+                    return InvalidParameterCode;
+                }
+
+                newElements.Add(clone!);
+            }
+
+            int previousSelected = _selectedElementIndex;
+            m_CurrShowElement = newElements;
+            if (_selectedElementIndex >= m_CurrShowElement.Count)
+            {
+                _selectedElementIndex = -1;
+            }
+
+            RaiseElementChanged(
+                PaintElementChangeAction.Replaced,
+                -1,
+                null,
+                null,
+                PaintElementChangeSource.Api,
+                PaintElementChangePhase.Committed);
+
+            RaiseSelectionChangedIfNeeded(
+                previousSelected,
+                _selectedElementIndex,
+                PaintElementChangeSource.Api);
+
+            InvalidateVisual();
+            return SuccessCode;
         }
 
         /// <summary>
@@ -206,9 +209,182 @@ namespace AvaloniaVisionControl
         /// </summary>
         public int ChangePaintElement(int index, PaintElement element)
         {
-            if (m_CurrShowElement.Count > index)
-                m_CurrShowElement[index] = element;
-            return 0;
+            if (!IsIndexValid(index))
+            {
+                return OutOfRangeCode;
+            }
+
+            if (!TryCloneValidElement(element, out var clone))
+            {
+                return InvalidParameterCode;
+            }
+
+            var before = m_CurrShowElement[index].DeepCopy();
+            m_CurrShowElement[index] = clone!;
+
+            RaiseElementChanged(
+                PaintElementChangeAction.Updated,
+                index,
+                before,
+                m_CurrShowElement[index],
+                PaintElementChangeSource.Api,
+                PaintElementChangePhase.Committed);
+
+            InvalidateVisual();
+            return SuccessCode;
+        }
+
+        public int AddPaintElement(PaintElement element)
+        {
+            if (!TryCloneValidElement(element, out var clone))
+            {
+                return InvalidParameterCode;
+            }
+
+            m_CurrShowElement.Add(clone!);
+            int index = m_CurrShowElement.Count - 1;
+            RaiseElementChanged(
+                PaintElementChangeAction.Added,
+                index,
+                null,
+                m_CurrShowElement[index],
+                PaintElementChangeSource.Api,
+                PaintElementChangePhase.Committed);
+
+            InvalidateVisual();
+            return SuccessCode;
+        }
+
+        public int InsertPaintElement(int index, PaintElement element)
+        {
+            if (index < 0 || index > m_CurrShowElement.Count)
+            {
+                return OutOfRangeCode;
+            }
+
+            if (!TryCloneValidElement(element, out var clone))
+            {
+                return InvalidParameterCode;
+            }
+
+            m_CurrShowElement.Insert(index, clone!);
+            int previousSelected = _selectedElementIndex;
+            if (_selectedElementIndex >= index)
+            {
+                _selectedElementIndex++;
+            }
+
+            RaiseElementChanged(
+                PaintElementChangeAction.Added,
+                index,
+                null,
+                m_CurrShowElement[index],
+                PaintElementChangeSource.Api,
+                PaintElementChangePhase.Committed);
+
+            RaiseSelectionChangedIfNeeded(previousSelected, _selectedElementIndex, PaintElementChangeSource.Api);
+
+            InvalidateVisual();
+            return SuccessCode;
+        }
+
+        public int RemovePaintElementAt(int index)
+        {
+            if (!IsIndexValid(index))
+            {
+                return OutOfRangeCode;
+            }
+
+            var before = m_CurrShowElement[index].DeepCopy();
+            m_CurrShowElement.RemoveAt(index);
+
+            int previousSelected = _selectedElementIndex;
+            if (_selectedElementIndex == index)
+            {
+                _selectedElementIndex = -1;
+            }
+            else if (_selectedElementIndex > index)
+            {
+                _selectedElementIndex--;
+            }
+
+            RaiseElementChanged(
+                PaintElementChangeAction.Removed,
+                index,
+                before,
+                null,
+                PaintElementChangeSource.Api,
+                PaintElementChangePhase.Committed);
+
+            RaiseSelectionChangedIfNeeded(previousSelected, _selectedElementIndex, PaintElementChangeSource.Api);
+
+            InvalidateVisual();
+            return SuccessCode;
+        }
+
+        public int ClearPaintElements()
+        {
+            if (m_CurrShowElement.Count == 0)
+            {
+                return SuccessCode;
+            }
+
+            int previousSelected = _selectedElementIndex;
+            m_CurrShowElement.Clear();
+            _selectedElementIndex = -1;
+
+            RaiseElementChanged(
+                PaintElementChangeAction.Cleared,
+                -1,
+                null,
+                null,
+                PaintElementChangeSource.Api,
+                PaintElementChangePhase.Committed);
+
+            RaiseSelectionChangedIfNeeded(previousSelected, _selectedElementIndex, PaintElementChangeSource.Api);
+
+            InvalidateVisual();
+            return SuccessCode;
+        }
+
+        public IReadOnlyList<PaintElement> GetPaintElementsSnapshot()
+        {
+            var result = new List<PaintElement>(m_CurrShowElement.Count);
+            foreach (var element in m_CurrShowElement)
+            {
+                result.Add(element.DeepCopy());
+            }
+
+            return result;
+        }
+
+        public int SetSelectedElementIndex(int index)
+        {
+            if (index < -1)
+            {
+                return InvalidParameterCode;
+            }
+
+            if (index >= 0 && m_CurrShowElement.Count == 0)
+            {
+                return InvalidStateCode;
+            }
+
+            if (index >= m_CurrShowElement.Count)
+            {
+                return OutOfRangeCode;
+            }
+
+            int previousSelected = _selectedElementIndex;
+            _selectedElementIndex = index;
+            RaiseSelectionChangedIfNeeded(previousSelected, _selectedElementIndex, PaintElementChangeSource.Api);
+            InvalidateVisual();
+            return SuccessCode;
+        }
+
+        public int GetSelectedElementIndex()
+        {
+            return _selectedElementIndex;
         }
 
         /// <summary>
@@ -219,39 +395,119 @@ namespace AvaloniaVisionControl
             InvalidateVisual();
         }
 
+        private bool TrySetSelectedElementIndexInternal(int index, PaintElementChangeSource source)
+        {
+            if (index < -1 || index >= m_CurrShowElement.Count)
+            {
+                return false;
+            }
+
+            int previousSelected = _selectedElementIndex;
+            _selectedElementIndex = index;
+            RaiseSelectionChangedIfNeeded(previousSelected, _selectedElementIndex, source);
+            return previousSelected != _selectedElementIndex;
+        }
+
+        private void RaiseSelectionChangedIfNeeded(int beforeIndex, int afterIndex, PaintElementChangeSource source)
+        {
+            if (beforeIndex == afterIndex)
+            {
+                return;
+            }
+
+            RaiseElementChanged(
+                PaintElementChangeAction.Selected,
+                afterIndex,
+                CloneElementAt(beforeIndex),
+                CloneElementAt(afterIndex),
+                source,
+                PaintElementChangePhase.Committed);
+        }
+
+        private PaintElement? CloneElementAt(int index)
+        {
+            if (!IsIndexValid(index))
+            {
+                return null;
+            }
+
+            return m_CurrShowElement[index].DeepCopy();
+        }
+
+        private void RaiseElementChanged(
+            PaintElementChangeAction action,
+            int index,
+            PaintElement? before,
+            PaintElement? after,
+            PaintElementChangeSource source,
+            PaintElementChangePhase phase)
+        {
+            ElementChanged?.Invoke(
+                this,
+                new PaintElementChangedEventArgs(
+                    action,
+                    index,
+                    before?.DeepCopy(),
+                    after?.DeepCopy(),
+                    source,
+                    phase));
+        }
+
+        private bool IsIndexValid(int index)
+        {
+            return index >= 0 && index < m_CurrShowElement.Count;
+        }
+
+        private bool TryCloneValidElement(PaintElement? element, out PaintElement? clone)
+        {
+            clone = null;
+            if (element == null || !IsValidElement(element))
+            {
+                return false;
+            }
+
+            clone = element.DeepCopy();
+            return true;
+        }
+
+        private static bool IsValidElement(PaintElement element)
+        {
+            if (element.Pts == null || element.Pts.Count < 2 || element.Pts.Count % 2 != 0)
+            {
+                return false;
+            }
+
+            return element.Type switch
+            {
+                PaintElementType.Point => element.Pts.Count >= 2,
+                PaintElementType.Cross => element.Pts.Count >= 2,
+                PaintElementType.Text => element.Pts.Count >= 2,
+                PaintElementType.Line => element.Pts.Count >= 4,
+                PaintElementType.Rectangle => element.Pts.Count >= 4,
+                PaintElementType.Circle => element.Pts.Count >= 4,
+                PaintElementType.Ellipse => element.Pts.Count >= 4,
+                PaintElementType.Arrow => element.Pts.Count >= 4,
+                PaintElementType.PolyLine => element.Pts.Count >= 4,
+                PaintElementType.Polygon => element.Pts.Count >= 6,
+                PaintElementType.Ring => element.Pts.Count >= 6,
+                PaintElementType.Arc => element.Pts.Count >= 6,
+                _ => false
+            };
+        }
+
         /// <summary>
-        /// 将图像像素坐标转换为机械坐标（绝对坐标，单位：mm）
+        /// 兼容旧 API：在纯图像模式下返回图像像素坐标
         /// </summary>
         /// <param name="imagePixelPosition">图像中的像素坐标</param>
-        /// <returns>机械坐标（绝对坐标，单位：mm）</returns>
+        /// <returns>图像像素坐标</returns>
         public Point ConvertImageToMachinePosition(Point imagePixelPosition)
         {
             if (_originImage == null)
-                throw new InvalidOperationException("图像未加载，无法进行坐标转换");
+                return imagePixelPosition;
 
-            // 计算图像中心（像素坐标）
-            double imageCenterX = _originImage.PixelSize.Width / 2.0;
-            double imageCenterY = _originImage.PixelSize.Height / 2.0;
-
-            // 将像素坐标转换为相对于图像中心的坐标
-            Point relativePixelPos = new Point(
-                imagePixelPosition.X - imageCenterX,
-                imagePixelPosition.Y - imageCenterY
-            );
-
-            // 计算逆变换矩阵（从像素到机械）
-            double[] pixToMMMatrix = CalculateInverseTransform(m_9MMToPixMatrix);
-
-            // 将像素坐标转换为相对于视野中心的机械坐标
-            Point relativeMachPos = TransformPoint(relativePixelPos, pixToMMMatrix);
-
-            // 加上当前机械位置，得到绝对机械坐标
-            Point absoluteMachPos = new Point(
-                relativeMachPos.X + MotionMgr.Ins.CurrMachPos.X,
-                relativeMachPos.Y + MotionMgr.Ins.CurrMachPos.Y
-            );
-
-            return absoluteMachPos;
+            return new Point(
+                Math.Clamp(imagePixelPosition.X, 0, _originImage.PixelSize.Width),
+                Math.Clamp(imagePixelPosition.Y, 0, _originImage.PixelSize.Height));
         }
 
         /// <summary>
@@ -456,4 +712,3 @@ namespace AvaloniaVisionControl
         }
     }
 }
-

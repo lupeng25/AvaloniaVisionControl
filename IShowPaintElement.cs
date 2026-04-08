@@ -21,28 +21,28 @@ namespace AvaloniaVisionControl
         ImageCtlMouseStatus CtlMouseStatus { get; set; }
 
         /// <summary>
-        /// 设置相机标定参数（通过文件路径）
+        /// 兼容旧版本：设置相机标定参数（当前纯图像模式下无实际作用）
         /// </summary>
         /// <param name="calibFilePath">标定文件路径</param>
         /// <returns>0 表示成功，负数表示失败</returns>
         int SetCameraCalib(string calibFilePath);
 
         /// <summary>
-        /// 设置相机标定参数（像素到机械坐标的变换矩阵）
+        /// 兼容旧版本：设置相机标定参数（当前纯图像模式下无实际作用）
         /// </summary>
-        /// <param name="matrixPixToMM">像素→mm 的 3×3 仿射变换矩阵（9 元素数组）</param>
+        /// <param name="matrixPixToMM">历史参数，当前不使用</param>
         /// <returns>0 表示成功，负数表示失败</returns>
         int SetCameraCalib(double[] matrixPixToMM);
 
         /// <summary>
-        /// 设置相机标定参数（机械坐标到像素的变换矩阵）
+        /// 兼容旧版本：设置相机标定参数（当前纯图像模式下无实际作用）
         /// </summary>
-        /// <param name="matrixMMToPix">mm→像素 的 3×3 仿射变换矩阵（9 元素数组）</param>
+        /// <param name="matrixMMToPix">历史参数，当前不使用</param>
         /// <returns>0 表示成功，负数表示失败</returns>
         int SetCameraCalibRef(double[] matrixMMToPix);
 
         /// <summary>
-        /// 设置更新相机位置的回调函数
+        /// 兼容旧版本：设置更新回调（当前纯图像模式下无实际作用）
         /// </summary>
         /// <param name="getPosFunc">获取位置的函数</param>
         /// <returns>0 表示成功，负数表示失败</returns>
