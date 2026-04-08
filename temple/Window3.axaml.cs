@@ -11,7 +11,6 @@ using AvaloniaVisionControl;
 using System;
 using System.Collections.Generic;
 using System.IO;
-using UserControlApp.ViewModels;
 
 namespace UserControlApp;
 
