@@ -162,12 +162,15 @@ namespace AvaloniaVisionControl
         /// </summary>
         public static int ShowImageFromFile(CtlOnlyShowImage control, int cameraId, string filePath)
         {
+            if (control == null || string.IsNullOrWhiteSpace(filePath))
+            {
+                return -1;
+            }
+
             try
             {
                 using var stream = System.IO.File.OpenRead(filePath);
-                var bitmap = new Bitmap(stream);
-                var eventArgs = new ReceiveBitmapEventArgs(cameraId, bitmap);
-                return control.ShowImage(eventArgs);
+                return control.ShowImageFromStream(cameraId, stream);
             }
             catch
             {
@@ -176,15 +179,14 @@ namespace AvaloniaVisionControl
         }
 
         /// <summary>
-        /// 显示图像（从 Bitmap）
+        /// 显示图像（从 Bitmap，安全复制模式）
         /// </summary>
         public static int ShowImageFromBitmap(CtlOnlyShowImage control, int cameraId, Bitmap bitmap)
         {
-            if (bitmap == null)
+            if (control == null || bitmap == null)
                 return -1;
 
-            var eventArgs = new ReceiveBitmapEventArgs(cameraId, bitmap);
-            return control.ShowImage(eventArgs);
+            return control.ShowImageCopy(cameraId, bitmap);
         }
 
         /// <summary>
@@ -192,20 +194,26 @@ namespace AvaloniaVisionControl
         /// </summary>
         public static void AddPaintElements(CtlOnlyShowImage control, params PaintElement[] elements)
         {
-            var currentElements = new List<PaintElement>();
-            
-            // 获取现有图元（如果有）
-            // 注意：这里需要访问私有成员，实际使用时可能需要通过其他方式获取
-            
-            // 添加新图元
+            if (control == null || elements == null || elements.Length == 0)
+            {
+                return;
+            }
+
+            var currentElements = new List<PaintElement>(control.GetPaintElementsSnapshot());
             foreach (var element in elements)
             {
                 if (element != null)
-                    currentElements.Add(element);
+                {
+                    currentElements.Add(element.DeepCopy());
+                }
             }
 
             control.SetPaintElements(currentElements);
-            control.CtlShowPaintStatus = ImageElementCtlStatus.ShowAll;
+            if (control.CtlShowPaintStatus == ImageElementCtlStatus.None)
+            {
+                control.CtlShowPaintStatus = ImageElementCtlStatus.ShowAll;
+            }
+
             control.ReFresh();
         }
 

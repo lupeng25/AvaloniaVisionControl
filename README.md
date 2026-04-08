@@ -1,17 +1,24 @@
-# AvaloniaVisionControl
-  
+﻿# AvaloniaVisionControl
 
-## 🚀 快速开始
+`AvaloniaVisionControl` 是一个面向 Avalonia 的图像显示控件，提供：
 
-### 安装
+- 图像显示（棋盘背景）
+- 鼠标滚轮缩放、左键拖拽平移、双击复位
+- 图元叠加绘制（点/线/圆/矩形/椭圆/多边形/文本/箭头等）
+- 图元交互编辑（选中、拖动、句柄缩放）
+- 视口自适应：窗口 `resize` 时自动重算默认缩放并约束平移边界
 
-#### 方式1：NuGet 包
+当前版本使用**纯图像像素坐标模式**。
+
+## 1. 安装
+
+### NuGet
 
 ```bash
 dotnet add package AvaloniaVisionControl
 ```
 
-#### 方式2：项目引用
+### 项目引用
 
 ```xml
 <ItemGroup>
@@ -19,68 +26,131 @@ dotnet add package AvaloniaVisionControl
 </ItemGroup>
 ```
 
-#### 方式3：DLL 引用
+## 2. 快速接入
 
-```xml
-<ItemGroup>
-  <Reference Include="AvaloniaVisionControl">
-    <HintPath>lib\AvaloniaVisionControl.dll</HintPath>
-  </Reference>
-</ItemGroup>
-```
-
-### 基本使用
-
-#### 1. 在 XAML 中使用
+### XAML
 
 ```xml
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vision="using:AvaloniaVisionControl"
-        x:Class="YourApp.MainWindow"
-        Title="图像显示示例">
-    
-    <Grid>
-        <vision:CtlOnlyShowImage x:Name="ImageControl"
-                                 AllowMouseScroll="True"/>
-    </Grid>
+        x:Class="YourApp.MainWindow">
+
+  <vision:CtlOnlyShowImage x:Name="ImageControl"/>
 </Window>
 ```
 
-#### 2. 在代码中使用
+### C#（推荐）
 
 ```csharp
 using AvaloniaVisionControl;
-using Avalonia.Media.Imaging;
-using System.IO;
 
-// 创建控件
-var imageControl = new CtlOnlyShowImage(0);
+// 只接收 cameraId=0 的图像
+var imageControl = new CtlOnlyShowImage(0)
+{
+    AllowMouseScroll = true
+};
 
-// 设置标定（1像素 = 0.1mm）
-imageControl.SetCameraCalib(new Point(0.1, 0.1), 1024, 768);
-
-// 加载并显示图像
-using var stream = File.OpenRead("image.png");
-var bitmap = new Bitmap(stream);
-var eventArgs = new ReceiveBitmapEventArgs(0, bitmap);
-imageControl.ShowImage(eventArgs);
+// 图元默认不显示，需要显式设置
+imageControl.CtlShowPaintStatus = ImageElementCtlStatus.ShowAll;
 ```
 
-#### 3. 添加图元
+### 属性绑定（Avalonia Property）
+
+控件的以下公开属性已使用 Avalonia Property，可直接参与 XAML 绑定/样式：
+
+- `AllowMouseScroll`
+- `NeedShowCam`
+- `CtlShowPaintStatus`
+- `CtlMouseStatus`
+
+示例：
+
+```xml
+<vision:CtlOnlyShowImage
+    AllowMouseScroll="{Binding EnableWheelZoom}"
+    NeedShowCam="{Binding ActiveCameraIds}"
+    CtlShowPaintStatus="{Binding PaintDisplayMode}" />
+```
+
+## 3. 图像输入（重点）
+
+控件支持 3 种输入方式：
+
+### 3.1 推荐：`ShowImageFromStream`
 
 ```csharp
-using System.Collections.Generic;
-using Avalonia.Media;
+using var stream = File.OpenRead("test.png");
+int code = imageControl.ShowImageFromStream(0, stream);
+```
 
+- `0`：成功
+- `-1`：相机 ID 不匹配
+- `-2`：参数或图像数据无效
+
+### 3.2 推荐：`ShowImageCopy`
+
+```csharp
+int code = imageControl.ShowImageCopy(0, bitmap);
+```
+
+适合你仍要继续使用 `bitmap` 的场景。
+
+说明：`ShowImageCopy` 当前使用像素复制路径（`CopyPixels`），不再走 `Save -> Stream -> Decode` 的编解码链路。
+
+### 3.3 兼容：`ShowImage(ReceiveBitmapEventArgs)`
+
+```csharp
+var args = new ReceiveBitmapEventArgs(0, bitmap);
+int code = imageControl.ShowImage(args);
+```
+
+**所有权语义**：当返回 `0` 时，控件接管该 `bitmap` 生命周期，调用方不要再释放或访问它。
+
+## 4. 相机过滤规则
+
+控件只显示 `NeedShowCam` 中包含的 `CamID`：
+
+```csharp
+imageControl.NeedShowCam = new[] { 0, 1 };
+```
+
+或构造时设置：
+
+```csharp
+var imageControl = new CtlOnlyShowImage(0, 1);
+```
+
+注意：`NeedShowCam` 为空数组时，不接收任何图像（`ShowImage*` 返回 `-1`）。
+
+补充：`ShowImageFromStream` / `ShowImageCopy` 会先做相机 ID 过滤，再执行解码或复制。
+
+## 5. 图元使用
+
+### 5.1 坐标约定
+
+- `PaintElement.Pts` 使用图像像素坐标：`[x1, y1, x2, y2, ...]`
+- 原点在图像左上角
+
+### 5.2 添加图元
+
+```csharp
 var elements = new List<PaintElement>
 {
     new PaintElement
     {
-        Type = PaintElementType.Circle,
-        Pts = new List<double> { 10.0, 20.0, 15.0, 20.0 },
-        Color = Colors.Red,
-        LineWidth = 2.0,
+        Type = PaintElementType.Rectangle,
+        Pts = new List<double> { 100, 80, 280, 200 },
+        Color = Colors.Lime,
+        LineWidth = 2,
+        Visible = true
+    },
+    new PaintElement
+    {
+        Type = PaintElementType.Arrow,
+        Pts = new List<double> { 50, 50, 200, 120 },
+        Color = Colors.OrangeRed,
+        LineWidth = 2,
         Visible = true
     }
 };
@@ -90,290 +160,123 @@ imageControl.CtlShowPaintStatus = ImageElementCtlStatus.ShowAll;
 imageControl.ReFresh();
 ```
 
-## 📚 核心类
+### 5.3 图元有效性规则（最小点数）
 
-### CtlOnlyShowImage
+- `Point`/`Cross`/`Text`：至少 2 个数值（1 个点）
+- `Line`/`Rectangle`/`Circle`/`Ellipse`/`Arrow`/`PolyLine`：至少 4 个数值
+- `Polygon`/`Ring`/`Arc`：至少 6 个数值
 
-主要的图像显示控件类。
+## 6. 图元交互编辑能力
 
-**主要属性**：
-- `AllowMouseScroll`: 是否允许鼠标滚轮缩放
-- `NeedShowCam`: 需要显示的相机ID列表
-- `CtlShowPaintStatus`: 图元显示状态
-- `CtlMouseStatus`: 鼠标状态
+当前支持“选中 + 拖动 + 改大小”的图元：
 
-**主要方法**：
-- `ShowImage(ReceiveBitmapEventArgs)`: 显示图像
-- `SetCameraCalib(...)`: 设置相机标定（多种重载）
-- `SetPaintElements(List<PaintElement>)`: 设置图元列表
-- `ChangePaintElement(int, PaintElement)`: 修改单个图元
-- `ReFresh()`: 刷新显示
-- `ConvertImageToMachinePosition(Point)`: 将图像像素坐标转换为机械坐标（绝对坐标，单位：mm）
+- `Rectangle`
+- `Ellipse`
+- `Circle`
+- `Line`
+- `Arrow`
+- `Polygon`
 
-**主要事件**：
-- `ImageClick`: 鼠标左键单击事件，用于控制机械手移动
+说明：
 
-### PaintElement
+- 矩形/椭圆：8 个边框句柄
+- 圆：中心点句柄 + 半径句柄
+- 线段/箭头：起点与终点句柄
+- 多边形：顶点句柄
 
-图元类，用于定义要绘制的图形元素。
+## 7. 事件
 
-**支持的图元类型**：
-- `Point`: 点
-- `Line`: 线段
-- `PolyLine`: 折线
-- `Circle`: 圆
-- `Rectangle`: 矩形
-- `Ellipse`: 椭圆
-- `Polygon`: 多边形
-- `Cross`: 十字
-- `Arrow`: 箭头
-- `Ring`: 圆环
-- `Arc`: 圆弧
-- `Text`: 文本
+### 7.1 `ImageClick`
 
-### MotionMgr
-
-运动管理器（单例），用于管理机械坐标。
+用户在图像空白区域单击左键触发：
 
 ```csharp
-// 更新机械位置（单位：mm）
-MotionMgr.Ins.UpdateMachPos(100.0, 200.0);
-
-// 获取当前机械位置
-var pos = MotionMgr.Ins.CurrMachPos;
-```
-
-## 🎨 使用辅助类
-
-项目包含 `ImageControlHelper` 辅助类，提供更简洁的 API：
-
-```csharp
-using AvaloniaVisionControl;
-
-// 快速创建控件
-var imageControl = ImageControlHelper.CreateImageControl(
-    cameraId: 0,
-    mmPerPixel: new Point(0.1, 0.1),
-    imageWidth: 1024,
-    imageHeight: 768
-);
-
-// 快速创建图元
-var circle = ImageControlHelper.CreateCircle(10, 20, 5, Colors.Red);
-var line = ImageControlHelper.CreateLine(0, 0, 50, 50, Colors.Green);
-
-// 批量添加图元
-ImageControlHelper.AddPaintElements(imageControl, circle, line);
-```
-
-## 🖱️ 鼠标交互
-
-控件默认支持以下鼠标操作：
-
-- **滚轮缩放**：鼠标滚轮上下滚动，以鼠标位置为中心缩放
-- **拖拽平移**：按住鼠标左键拖动图像
-- **双击复位**：双击图像恢复到默认缩放比例
-- **左键单击**：在图像上单击鼠标左键，触发 `ImageClick` 事件（供外部调用方订阅，用于控制机械手移动）
-
-禁用滚轮缩放：
-```csharp
-imageControl.AllowMouseScroll = false;
-```
-
-### 鼠标左键单击事件（供外部调用方使用）
-
-控件提供了 `ImageClick` 事件，供**外部调用方**订阅并处理。当用户在图像上单击鼠标左键时，会触发此事件，调用方可以在事件处理中实现自己的机械手控制逻辑。
-
-**事件参数 `ImageClickEventArgs`**：
-- `ControlPosition`：鼠标在控件中的位置（控件坐标，`Point` 类型）
-- `ImagePosition`：鼠标在图像中的位置（图像原始像素坐标，`Point` 类型）
-
-**基本使用示例**：
-
-```csharp
-// 在您的项目中订阅单击事件
-imageControl.ImageClick += (sender, e) =>
+imageControl.ImageClick += (s, e) =>
 {
-    // e.ImagePosition 是图像中的像素坐标
-    Point imagePos = e.ImagePosition;
-    Console.WriteLine($"点击位置 - 图像坐标: X={imagePos.X:F2}, Y={imagePos.Y:F2}");
-    
-    // 可选：将图像坐标转换为机械坐标（需要先设置相机标定）
-    // Point machinePos = imageControl.ConvertImageToMachinePosition(imagePos);
-    // Console.WriteLine($"机械坐标: X={machinePos.X:F2}mm, Y={machinePos.Y:F2}mm");
-    
-    // 在这里实现您的机械手控制逻辑
-    // YourRobotController.MoveTo(machinePos.X, machinePos.Y);
+    // e.ControlPosition: 控件坐标
+    // e.ImagePosition: 图像像素坐标
 };
 ```
 
-**完整示例：在您的项目中集成鼠标单击控制**：
+### 7.2 `ElementChanged`
+
+图元由 API 或交互发生变化时触发：
 
 ```csharp
-using Avalonia;
-using AvaloniaVisionControl;
-
-// 这是您的项目代码，不是本项目的代码
-public class YourMainWindow : Window
+imageControl.ElementChanged += (s, e) =>
 {
-    private CtlOnlyShowImage _imageControl;
-    private YourRobotController _robotController; // 您的机械手控制器
-    
-    public YourMainWindow()
-    {
-        InitializeComponent();
-        
-        // 1. 获取或创建图像控件
-        _imageControl = this.FindControl<CtlOnlyShowImage>("ImageControl");
-        
-        // 2. 设置相机标定（如果需要进行坐标转换）
-        _imageControl.SetCameraCalib(new Point(0.1, 0.1), 1024, 768);
-        
-        // 3. 设置当前机械位置（视野中心对应的机械坐标）
-        MotionMgr.Ins.UpdateMachPos(100.0, 200.0); // 单位：mm
-        
-        // 4. 订阅单击事件，实现您的机械手控制逻辑
-        _imageControl.ImageClick += OnImageClick;
-    }
-    
-    private void OnImageClick(object sender, ImageClickEventArgs e)
-    {
-        // 获取图像像素坐标
-        Point imagePos = e.ImagePosition;
-        
-        // 转换为机械坐标（绝对坐标，单位：mm）
-        Point machinePos = _imageControl.ConvertImageToMachinePosition(imagePos);
-        
-        // 调用您的机械手控制方法
-        _robotController.MoveTo(machinePos.X, machinePos.Y);
-        
-        // 如果机械手移动成功，更新机械位置（以便图元正确显示）
-        // MotionMgr.Ins.UpdateMachPos(machinePos.X, machinePos.Y);
-    }
-}
+    // e.Action: Added/Updated/Removed/Selected/Cleared/Replaced
+    // e.Source: Api 或 Interaction
+    // e.Phase : Preview 或 Committed
+};
 ```
 
-**重要说明**：
+## 8. 常用 API 返回码
 
-1. **这是给外部调用方使用的 API**：`ImageClick` 事件是提供给您的项目使用的，您需要在自己的项目中订阅此事件并实现机械手控制逻辑
-2. **坐标转换是可选的**：如果您的机械手控制不需要坐标转换，可以直接使用 `e.ImagePosition`（像素坐标）
-3. **必须设置相机标定**：如果需要进行坐标转换（调用 `ConvertImageToMachinePosition`），必须先调用 `SetCameraCalib` 方法设置标定参数
-4. **更新机械位置**：当机械手实际移动后，建议调用 `MotionMgr.Ins.UpdateMachPos` 更新当前机械位置，以便图元正确显示
-5. **坐标系统**：
-   - 图像坐标原点在左上角（像素坐标）
-   - 机械坐标原点由标定确定，通常视野中心对应当前机械位置
-   - `ConvertImageToMachinePosition` 返回的是绝对机械坐标（单位：mm）
-6. **单击与拖拽**：系统会自动区分单击和拖拽操作，只有真正的单击（移动距离 < 5像素）才会触发事件
+### 8.1 图像输入
 
-## ⚙️ 相机标定
+- `ShowImage*`：`0` 成功，`-1` 相机不匹配，`-2` 参数无效
 
-### 方式1：简化标定（像素当量）
+### 8.2 图元管理
 
-```csharp
-// 设置像素当量：1像素 = 0.1mm
-var mmPerPixel = new Point(0.1, 0.1);
-imageControl.SetCameraCalib(mmPerPixel, imageWidth, imageHeight);
-```
+- `0`：成功
+- `-1`：参数无效
+- `-2`：索引越界
+- `-3`：状态无效（如空列表下设置选中索引）
 
-### 方式2：变换矩阵
+## 9. 辅助类 `ImageControlHelper`
 
-```csharp
-// 像素到机械坐标的变换矩阵（9元素数组）
-double[] matrixPixToMM = new double[9] { /* ... */ };
-imageControl.SetCameraCalib(matrixPixToMM);
+常用快捷方法：
 
-// 或机械坐标到像素的变换矩阵
-double[] matrixMMToPix = new double[9] { /* ... */ };
-imageControl.SetCameraCalibRef(matrixMMToPix);
-```
+- `CreateImageControl(...)`
+- `ShowImageFromFile(...)`（内部走 `ShowImageFromStream`）
+- `ShowImageFromBitmap(...)`（内部走 `ShowImageCopy`）
+- `AddPaintElements(...)`（在现有图元基础上追加，不覆盖）
+- `ClearPaintElements(...)`
 
-## 📋 完整示例
+## 10. 兼容接口说明
 
-```csharp
-using Avalonia;
-using Avalonia.Controls;
-using Avalonia.Media.Imaging;
-using AvaloniaVisionControl;
-using System.Collections.Generic;
-using System.IO;
+以下接口为兼容保留，在当前纯像素模式下不参与真实标定换算：
 
-public class ImageViewerExample
-{
-    private CtlOnlyShowImage _imageControl;
-    
-    public void Initialize()
-    {
-        // 1. 创建控件
-        _imageControl = new CtlOnlyShowImage(0);
-        
-        // 2. 设置标定
-        _imageControl.SetCameraCalib(new Point(0.1, 0.1), 1024, 768);
-        
-        // 3. 加载图像
-        LoadImage("test.png");
-        
-        // 4. 添加图元
-        AddPaintElements();
-        
-        // 5. 更新机械位置
-        MotionMgr.Ins.UpdateMachPos(100.0, 200.0);
-    }
-    
-    private void LoadImage(string filePath)
-    {
-        using var stream = File.OpenRead(filePath);
-        var bitmap = new Bitmap(stream);
-        var eventArgs = new ReceiveBitmapEventArgs(0, bitmap);
-        _imageControl.ShowImage(eventArgs);
-    }
-    
-    private void AddPaintElements()
-    {
-        var elements = new List<PaintElement>
-        {
-            new PaintElement
-            {
-                Type = PaintElementType.Circle,
-                Pts = new List<double> { 10.0, 20.0, 15.0, 20.0 },
-                Color = Colors.Red,
-                LineWidth = 2.0,
-                Visible = true
-            },
-            new PaintElement
-            {
-                Type = PaintElementType.Cross,
-                Pts = new List<double> { 0.0, 0.0 },
-                Color = Colors.Blue,
-                LineWidth = 2.0,
-                Visible = true
-            }
-        };
-        
-        _imageControl.SetPaintElements(elements);
-        _imageControl.CtlShowPaintStatus = ImageElementCtlStatus.ShowAll;
-        _imageControl.ReFresh();
-    }
-}
-```
+- `SetCameraCalib(string)`
+- `SetCameraCalib(double[])`
+- `SetCameraCalibRef(double[])`
+- `SetCameraCalib(Point, int, int)`
+- `SetUpdateCameraPos(Func<Point>)`
+- `ConvertImageToMachinePosition(Point)`（当前返回像素坐标并做边界裁剪）
 
-## ⚠️ 注意事项
+## 11. 常见问题
 
-1. **线程安全**：图像更新会自动在 UI 线程执行
-2. **资源释放**：控件会在从视觉树分离时自动释放图像资源
-3. **坐标系统**：
-   - 图元坐标使用**机械坐标**（单位：mm）
-   - 原点为视野中心
-   - 通过 `MotionMgr.Ins.CurrMachPos` 设置当前机械位置
-4. **性能建议**：
-   - 建议图元数量 < 1000 个
-   - 大图像建议使用合适的缩放比例
+### 图元设置后不显示
 
-## 📦 生成 NuGet 包
+请确认：
+
+- `CtlShowPaintStatus` 已设为 `ShowAll` 或 `ShowSelected`
+- 图元 `Visible = true`
+- `Pts` 点数符合最小要求
+- 图元坐标与图像坐标系一致（像素坐标）
+
+补充：图元绘制已取消“点在可视区内才绘制”的旧裁剪逻辑；即使仅部分落入视口，也会正常显示可见部分。
+
+### 图像不显示
+
+请确认：
+
+- `NeedShowCam` 包含当前 `CamID`
+- 图像输入返回码为 `0`
+
+### 窗口 resize 后显示异常
+
+当前版本在控件尺寸变化时会自动更新视口状态：
+
+- 若当前处于默认缩放（fit）状态，会随窗口大小重新适配。
+- 若当前是用户放大状态，会保持放大比例并自动夹紧平移边界。
+- 双击会复位到当前窗口下的 fit 视图。
+
+## 12. 打包
 
 ```bash
 dotnet pack -c Release
 ```
 
-生成的包位于：`bin/Release/AvaloniaVisionControl.1.0.0.nupkg`
-
-
+默认输出到 `bin/Release`。

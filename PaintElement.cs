@@ -10,6 +10,19 @@ namespace AvaloniaVisionControl
     /// </summary>
     public class PaintElement
     {
+        private const int MaxBrushCacheCount = 256;
+        private const int MaxPenCacheCount = 2048;
+        private const int MaxTextCacheCount = 1024;
+
+        private static readonly object CacheLock = new object();
+        private static readonly Dictionary<uint, IBrush> BrushCache = new Dictionary<uint, IBrush>();
+        private static readonly Dictionary<PenCacheKey, IPen> PenCache = new Dictionary<PenCacheKey, IPen>();
+        private static readonly Dictionary<TextCacheKey, FormattedText> TextCache = new Dictionary<TextCacheKey, FormattedText>();
+        private static readonly Typeface DefaultTypeface = new Typeface("Microsoft YaHei");
+
+        private readonly record struct PenCacheKey(uint ColorArgb, double Width);
+        private readonly record struct TextCacheKey(string Text, double FontSize, uint ColorArgb, string CultureName);
+
         /// <summary>
         /// 图元类型
         /// </summary>
@@ -95,8 +108,8 @@ namespace AvaloniaVisionControl
             double actualLineWidth = LineWidth * lineScale;
             if (actualLineWidth < 1) actualLineWidth = 1;
 
-            var pen = new Pen(new SolidColorBrush(Color), actualLineWidth);
-            var brush = new SolidColorBrush(Color);
+            var pen = GetCachedPen(Color, actualLineWidth);
+            var brush = GetCachedBrush(Color);
 
             switch (Type)
             {
@@ -145,7 +158,7 @@ namespace AvaloniaVisionControl
                     break;
 
                 case PaintElementType.Text:
-                    PaintText(context, brush, transformedPts);
+                    PaintText(context, transformedPts, brush);
                     break;
             }
         }
@@ -353,23 +366,95 @@ namespace AvaloniaVisionControl
             }
         }
 
-        private void PaintText(DrawingContext context, IBrush brush, List<float> pts)
+        private void PaintText(DrawingContext context, List<float> pts, IBrush brush)
         {
             if (pts.Count >= 2 && !string.IsNullOrEmpty(Text))
             {
                 var position = new Point(pts[0], pts[1]);
-                var typeface = new Typeface("Microsoft YaHei");
-                var formattedText = new FormattedText(
-                    Text,
-                    System.Globalization.CultureInfo.CurrentCulture,
-                    FlowDirection.LeftToRight,
-                    typeface,
-                    FontSize,
-                    brush
-                );
-                
+                var formattedText = GetCachedFormattedText(Text, FontSize, Color, brush);
                 context.DrawText(formattedText, position);
             }
+        }
+
+        private static IBrush GetCachedBrush(Color color)
+        {
+            uint colorKey = ToColorKey(color);
+            lock (CacheLock)
+            {
+                if (BrushCache.TryGetValue(colorKey, out IBrush? brush))
+                {
+                    return brush;
+                }
+
+                if (BrushCache.Count >= MaxBrushCacheCount)
+                {
+                    BrushCache.Clear();
+                }
+
+                brush = new SolidColorBrush(color);
+                BrushCache[colorKey] = brush;
+                return brush;
+            }
+        }
+
+        private static IPen GetCachedPen(Color color, double width)
+        {
+            double normalizedWidth = Math.Round(Math.Max(1.0, width), 2, MidpointRounding.AwayFromZero);
+            uint colorKey = ToColorKey(color);
+            var cacheKey = new PenCacheKey(colorKey, normalizedWidth);
+
+            lock (CacheLock)
+            {
+                if (PenCache.TryGetValue(cacheKey, out IPen? pen))
+                {
+                    return pen;
+                }
+
+                if (PenCache.Count >= MaxPenCacheCount)
+                {
+                    PenCache.Clear();
+                }
+
+                var brush = GetCachedBrush(color);
+                pen = new Pen(brush, normalizedWidth);
+                PenCache[cacheKey] = pen;
+                return pen;
+            }
+        }
+
+        private static FormattedText GetCachedFormattedText(string text, double fontSize, Color color, IBrush brush)
+        {
+            string cultureName = System.Globalization.CultureInfo.CurrentCulture.Name;
+            double normalizedFontSize = Math.Round(Math.Max(1.0, fontSize), 2, MidpointRounding.AwayFromZero);
+            var cacheKey = new TextCacheKey(text, normalizedFontSize, ToColorKey(color), cultureName);
+
+            lock (CacheLock)
+            {
+                if (TextCache.TryGetValue(cacheKey, out FormattedText? formattedText))
+                {
+                    return formattedText;
+                }
+
+                if (TextCache.Count >= MaxTextCacheCount)
+                {
+                    TextCache.Clear();
+                }
+
+                formattedText = new FormattedText(
+                    text,
+                    System.Globalization.CultureInfo.CurrentCulture,
+                    FlowDirection.LeftToRight,
+                    DefaultTypeface,
+                    normalizedFontSize,
+                    brush);
+                TextCache[cacheKey] = formattedText;
+                return formattedText;
+            }
+        }
+
+        private static uint ToColorKey(Color color)
+        {
+            return ((uint)color.A << 24) | ((uint)color.R << 16) | ((uint)color.G << 8) | color.B;
         }
     }
 }

@@ -36,13 +36,15 @@ namespace AvaloniaVisionControl
         /// 将图像像素坐标转换为控件坐标
         /// </summary>
         /// <param name="originData">原始图像像素坐标列表 [x1, y1, x2, y2, ...]</param>
-        /// <param name="type">图元类型</param>
-        /// <param name="imageRect">图像在控件中的矩形区域</param>
         /// <returns>转换后的控件坐标列表</returns>
-        protected List<float> GetTransedPts(List<double> originData, PaintElementType type, Rect imageRect)
+        protected List<float> GetTransedPts(List<double> originData)
         {
-            var result = new List<float>();
-            bool isVisible = false;
+            if (originData == null || originData.Count < 2)
+            {
+                return new List<float>();
+            }
+
+            var result = new List<float>(originData.Count);
 
             for (int i = 0; i + 1 < originData.Count; i += 2)
             {
@@ -54,24 +56,11 @@ namespace AvaloniaVisionControl
                     imageY * _currentZoomFactor + _scrollImageLocation.Y
                 );
 
-                if (type == PaintElementType.Line || type == PaintElementType.Text)
-                {
-                    isVisible = true;
-                }
-                else if (!isVisible)
-                {
-                    if (ctlV.X >= 0 && ctlV.Y >= 0 &&
-                        ctlV.X <= Bounds.Width && ctlV.Y <= Bounds.Height)
-                    {
-                        isVisible = true;
-                    }
-                }
-
                 result.Add((float)ctlV.X);
                 result.Add((float)ctlV.Y);
             }
 
-            return isVisible ? result : new List<float>();
+            return result;
         }
 
         private bool ShouldRenderElement(int index)
@@ -93,12 +82,34 @@ namespace AvaloniaVisionControl
         /// <summary>
         /// 控件显示图元的状态
         /// </summary>
-        public ImageElementCtlStatus CtlShowPaintStatus { get; set; }
+        public static readonly StyledProperty<ImageElementCtlStatus> CtlShowPaintStatusProperty =
+            AvaloniaProperty.Register<CtlOnlyShowImage, ImageElementCtlStatus>(
+                nameof(CtlShowPaintStatus),
+                ImageElementCtlStatus.None);
+
+        public ImageElementCtlStatus CtlShowPaintStatus
+        {
+            get => GetValue(CtlShowPaintStatusProperty);
+            set => SetValue(CtlShowPaintStatusProperty, value);
+        }
 
         /// <summary>
         /// 控件鼠标状态
         /// </summary>
-        public ImageCtlMouseStatus CtlMouseStatus { get; set; }
+        private ImageCtlMouseStatus _ctlMouseStatus = ImageCtlMouseStatus.Normal;
+
+        public static readonly DirectProperty<CtlOnlyShowImage, ImageCtlMouseStatus> CtlMouseStatusProperty =
+            AvaloniaProperty.RegisterDirect<CtlOnlyShowImage, ImageCtlMouseStatus>(
+                nameof(CtlMouseStatus),
+                o => o.CtlMouseStatus,
+                (o, v) => o.CtlMouseStatus = v,
+                ImageCtlMouseStatus.Normal);
+
+        public ImageCtlMouseStatus CtlMouseStatus
+        {
+            get => _ctlMouseStatus;
+            set => SetAndRaise(CtlMouseStatusProperty, ref _ctlMouseStatus, value);
+        }
 
         /// <summary>
         /// 计算线宽缩放比例

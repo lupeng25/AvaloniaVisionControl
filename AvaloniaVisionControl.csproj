@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <TargetFramework>net9.0</TargetFramework>
@@ -8,13 +8,13 @@
     
     <!-- NuGet 包信息 -->
     <PackageId>AvaloniaVisionControl</PackageId>
-    <Version>1.0.0</Version>
-    <Authors>Your Name</Authors>
-    <Company>Your Company</Company>
-    <Description>Avalonia图像显示控件，支持缩放、拖拽、图元叠加显示。完全独立于其他框架，只依赖Avalonia。</Description>
+    <Version>1.0.1</Version>
+    <Authors>lupeng25</Authors>
+    <Company>AVAVision</Company>
+    <Description>Avalonia image viewer control with zoom/pan and editable overlay elements in pure pixel mode.</Description>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageProjectUrl>https://github.com/yourusername/avalonia-vision-control</PackageProjectUrl>
-    <RepositoryUrl>https://github.com/yourusername/avalonia-vision-control</RepositoryUrl>
+    <PackageProjectUrl>https://github.com/lupeng25/temp</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/lupeng25/temp</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
     <PackageTags>avalonia;image;control;vision;display;ui;graphics</PackageTags>
     <PackageReadmeFile>README.md</PackageReadmeFile>
@@ -28,7 +28,6 @@
 
   <ItemGroup>
     <PackageReference Include="Avalonia" Version="11.3.3" />
-    <PackageReference Include="Avalonia.Desktop" Version="11.3.3" />
   </ItemGroup>
 
   <!-- 包含 README 文件到 NuGet 包 -->
@@ -37,3 +36,4 @@
   </ItemGroup>
 
 </Project>
+

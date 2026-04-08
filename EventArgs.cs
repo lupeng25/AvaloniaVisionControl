@@ -15,7 +15,9 @@ namespace AvaloniaVisionControl
         public int CamID { get; }
         
         /// <summary>
-        /// 图像数据
+        /// 图像数据。
+        /// 传入 <see cref="CtlOnlyShowImage.ShowImage(ReceiveBitmapEventArgs)"/> 并返回 0 后，
+        /// 位图生命周期将由控件接管，调用方不应继续释放或访问该对象。
         /// </summary>
         public Bitmap Image { get; }
 

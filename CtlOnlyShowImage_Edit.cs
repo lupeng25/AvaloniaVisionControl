@@ -361,6 +361,15 @@ namespace AvaloniaVisionControl
                         return true;
                     }
                 }
+                else if (element.Type == PaintElementType.Ellipse &&
+                         TryGetRectangleControlRect(element, out var ellipseRect))
+                {
+                    if (IsPointInEllipse(mousePosition, ellipseRect, ElementHitTolerance))
+                    {
+                        elementIndex = i;
+                        return true;
+                    }
+                }
                 else if (element.Type == PaintElementType.Circle &&
                          TryGetCircleControlGeometry(element, out var center, out var edge))
                 {
@@ -374,7 +383,7 @@ namespace AvaloniaVisionControl
                         return true;
                     }
                 }
-                else if (element.Type == PaintElementType.Line &&
+                else if ((element.Type == PaintElementType.Line || element.Type == PaintElementType.Arrow) &&
                          TryGetLineControlGeometry(element, out var lineStart, out var lineEnd))
                 {
                     if (DistanceToSegment(mousePosition, lineStart, lineEnd) <= ElementHitTolerance)
@@ -431,12 +440,22 @@ namespace AvaloniaVisionControl
                     deltaImageX,
                     deltaImageY,
                     pixelToMachineMatrix),
+                PaintElementType.Ellipse => TryMoveRectangleElement(
+                    element,
+                    deltaImageX,
+                    deltaImageY,
+                    pixelToMachineMatrix),
                 PaintElementType.Circle => TryMoveCircleElement(
                     element,
                     deltaImageX,
                     deltaImageY,
                     pixelToMachineMatrix),
                 PaintElementType.Line => TryMoveLineElement(
+                    element,
+                    deltaImageX,
+                    deltaImageY,
+                    pixelToMachineMatrix),
+                PaintElementType.Arrow => TryMoveLineElement(
                     element,
                     deltaImageX,
                     deltaImageY,
@@ -474,7 +493,8 @@ namespace AvaloniaVisionControl
                 return TryResizeCircleRadius(element, mousePosition, pixelToMachineMatrix);
             }
 
-            if (element.Type == PaintElementType.Rectangle && IsRectangleHandle(_activeHandleType))
+            if ((element.Type == PaintElementType.Rectangle || element.Type == PaintElementType.Ellipse) &&
+                IsRectangleHandle(_activeHandleType))
             {
                 if (_currentZoomFactor <= 0)
                 {
@@ -491,7 +511,7 @@ namespace AvaloniaVisionControl
                     pixelToMachineMatrix);
             }
 
-            if (element.Type == PaintElementType.Line &&
+            if ((element.Type == PaintElementType.Line || element.Type == PaintElementType.Arrow) &&
                 (_activeHandleType == ElementHandleType.LineStart || _activeHandleType == ElementHandleType.LineEnd))
             {
                 return TryResizeLineElement(element, mousePosition, pixelToMachineMatrix);
@@ -1000,7 +1020,8 @@ namespace AvaloniaVisionControl
         private bool TryGetRectangleControlRect(PaintElement element, out Rect rect)
         {
             rect = default;
-            if (element.Type != PaintElementType.Rectangle || element.Pts.Count < 4)
+            if ((element.Type != PaintElementType.Rectangle && element.Type != PaintElementType.Ellipse) ||
+                element.Pts.Count < 4)
             {
                 return false;
             }
@@ -1020,7 +1041,8 @@ namespace AvaloniaVisionControl
             p1Image = default;
             p2Image = default;
             normalizedRect = default;
-            if (element.Type != PaintElementType.Rectangle || element.Pts.Count < 4)
+            if ((element.Type != PaintElementType.Rectangle && element.Type != PaintElementType.Ellipse) ||
+                element.Pts.Count < 4)
             {
                 return false;
             }
@@ -1069,7 +1091,8 @@ namespace AvaloniaVisionControl
         {
             start = default;
             end = default;
-            if (element.Type != PaintElementType.Line || element.Pts.Count < 4)
+            if ((element.Type != PaintElementType.Line && element.Type != PaintElementType.Arrow) ||
+                element.Pts.Count < 4)
             {
                 return false;
             }
@@ -1083,7 +1106,8 @@ namespace AvaloniaVisionControl
         {
             startImage = default;
             endImage = default;
-            if (element.Type != PaintElementType.Line || element.Pts.Count < 4)
+            if ((element.Type != PaintElementType.Line && element.Type != PaintElementType.Arrow) ||
+                element.Pts.Count < 4)
             {
                 return false;
             }
@@ -1130,7 +1154,7 @@ namespace AvaloniaVisionControl
         private List<HandlePoint> GetHandlePoints(PaintElement element)
         {
             var handlePoints = new List<HandlePoint>();
-            if (element.Type == PaintElementType.Rectangle &&
+            if ((element.Type == PaintElementType.Rectangle || element.Type == PaintElementType.Ellipse) &&
                 TryGetRectangleControlRect(element, out var rect))
             {
                 double left = rect.Left;
@@ -1155,7 +1179,7 @@ namespace AvaloniaVisionControl
                 handlePoints.Add(new HandlePoint(ElementHandleType.CircleCenter, center));
                 handlePoints.Add(new HandlePoint(ElementHandleType.CircleRadiusPoint, edge));
             }
-            else if (element.Type == PaintElementType.Line &&
+            else if ((element.Type == PaintElementType.Line || element.Type == PaintElementType.Arrow) &&
                      TryGetLineControlGeometry(element, out var start, out var end))
             {
                 handlePoints.Add(new HandlePoint(ElementHandleType.LineStart, start));
@@ -1190,14 +1214,16 @@ namespace AvaloniaVisionControl
         {
             return element.Visible &&
                    element.Pts.Count >= 4 &&
-                   element.Type switch
-                   {
-                       PaintElementType.Rectangle => element.Pts.Count >= 4,
-                       PaintElementType.Circle => element.Pts.Count >= 4,
-                       PaintElementType.Line => element.Pts.Count >= 4,
-                       PaintElementType.Polygon => element.Pts.Count >= 6 && element.Pts.Count % 2 == 0,
-                       _ => false
-                   };
+                    element.Type switch
+                    {
+                        PaintElementType.Rectangle => element.Pts.Count >= 4,
+                        PaintElementType.Ellipse => element.Pts.Count >= 4,
+                        PaintElementType.Circle => element.Pts.Count >= 4,
+                        PaintElementType.Line => element.Pts.Count >= 4,
+                        PaintElementType.Arrow => element.Pts.Count >= 4,
+                        PaintElementType.Polygon => element.Pts.Count >= 6 && element.Pts.Count % 2 == 0,
+                        _ => false
+                    };
         }
 
         private bool TryGetPixelToMachineMatrix(out double[] pixelToMachineMatrix)
@@ -1437,6 +1463,31 @@ namespace AvaloniaVisionControl
             t = Math.Clamp(t, 0, 1);
             var projection = new Point(segmentStart.X + t * dx, segmentStart.Y + t * dy);
             return Distance(point, projection);
+        }
+
+        private static bool IsPointInEllipse(Point point, Rect rect, double tolerance)
+        {
+            if (rect.Width < double.Epsilon || rect.Height < double.Epsilon)
+            {
+                return false;
+            }
+
+            double centerX = rect.X + rect.Width / 2.0;
+            double centerY = rect.Y + rect.Height / 2.0;
+            double radiusX = rect.Width / 2.0;
+            double radiusY = rect.Height / 2.0;
+
+            // 扩展半径用于命中容差，提升边缘可选中性。
+            double expandedRadiusX = radiusX + tolerance;
+            double expandedRadiusY = radiusY + tolerance;
+            if (expandedRadiusX <= double.Epsilon || expandedRadiusY <= double.Epsilon)
+            {
+                return false;
+            }
+
+            double normalizedX = (point.X - centerX) / expandedRadiusX;
+            double normalizedY = (point.Y - centerY) / expandedRadiusY;
+            return normalizedX * normalizedX + normalizedY * normalizedY <= 1.0;
         }
 
         private static bool IsPointInPolygon(Point point, List<Point> polygon)
