@@ -18,9 +18,6 @@ namespace AvaloniaVisionControl
         private double _currentZoomFactor = 1.0;
         private double _defZoomFactor = 1.0;
         private const double ZoomStep = 0.3;
-        private bool _isDragging;
-        private Point _dragStartPoint;
-        private Point _pressStartPoint; // 按下时的初始位置，用于判断单击
         private Point _scrollImageLocation = new Point(0, 0);
         private int _lastImageHeight = 0;
         private int _lastImageWidth = 0;
@@ -116,92 +113,19 @@ namespace AvaloniaVisionControl
         protected override void OnPointerPressed(PointerPressedEventArgs e)
         {
             base.OnPointerPressed(e);
-
-            var point = e.GetCurrentPoint(this);
-            if (point.Properties.IsLeftButtonPressed)
-            {
-                var imageRect = GetImageRectangle();
-                var mousePos = e.GetPosition(this);
-                
-                if (!imageRect.Contains(mousePos))
-                    return;
-
-                _isDragging = true;
-                _dragStartPoint = mousePos;
-                _pressStartPoint = mousePos; // 保存按下时的初始位置
-                Cursor = new Cursor(StandardCursorType.Hand);
-            }
+            HandlePointerPressed(e);
         }
 
         protected override void OnPointerMoved(PointerEventArgs e)
         {
             base.OnPointerMoved(e);
-
-            if (_isDragging)
-            {
-                var mousePos = e.GetPosition(this);
-                double deltaX = mousePos.X - _dragStartPoint.X;
-                double deltaY = mousePos.Y - _dragStartPoint.Y;
-
-                _scrollImageLocation = new Point(
-                    _scrollImageLocation.X + deltaX,
-                    _scrollImageLocation.Y + deltaY
-                );
-
-                LimitImageWithinBounds();
-                _dragStartPoint = mousePos;
-                InvalidateVisual();
-            }
-            else
-            {
-                UpdateCursorStyle(e.GetPosition(this));
-            }
+            HandlePointerMoved(e);
         }
 
         protected override void OnPointerReleased(PointerReleasedEventArgs e)
         {
             base.OnPointerReleased(e);
-
-            var point = e.GetCurrentPoint(this);
-            if (point.Properties.PointerUpdateKind == PointerUpdateKind.LeftButtonReleased)
-            {
-                var mousePos = e.GetPosition(this);
-                
-                // 检查是否是单击（不是拖拽）
-                if (_isDragging)
-                {
-                    // 使用按下时的初始位置计算总移动距离
-                    double dragDistance = Math.Sqrt(
-                        Math.Pow(mousePos.X - _pressStartPoint.X, 2) + 
-                        Math.Pow(mousePos.Y - _pressStartPoint.Y, 2)
-                    );
-                    
-                    // 如果移动距离小于阈值，认为是单击
-                    if (dragDistance < ClickThreshold)
-                    {
-                        var imageRect = GetImageRectangle();
-                        if (imageRect.Contains(mousePos) && _originImage != null)
-                        {
-                            // 计算鼠标在图像中的原始坐标
-                            double imageX = (mousePos.X - _scrollImageLocation.X) / _currentZoomFactor;
-                            double imageY = (mousePos.Y - _scrollImageLocation.Y) / _currentZoomFactor;
-                            
-                            // 确保坐标在图像范围内
-                            imageX = Math.Max(0, Math.Min(imageX, _originImage.PixelSize.Width));
-                            imageY = Math.Max(0, Math.Min(imageY, _originImage.PixelSize.Height));
-                            
-                            // 触发单击事件
-                            ImageClick?.Invoke(this, new ImageClickEventArgs(
-                                mousePos, 
-                                new Point(imageX, imageY)
-                            ));
-                        }
-                    }
-                }
-                
-                _isDragging = false;
-                Cursor = Cursor.Default;
-            }
+            HandlePointerReleased(e);
         }
 
         private void OnDoubleTapped(object sender, RoutedEventArgs e)
@@ -213,18 +137,7 @@ namespace AvaloniaVisionControl
 
         private void UpdateCursorStyle(Point mousePosition)
         {
-            if (_originImage != null)
-            {
-                var imageRect = GetImageRectangle();
-                if (imageRect.Contains(mousePosition) && _currentZoomFactor > _defZoomFactor)
-                {
-                    Cursor = new Cursor(StandardCursorType.Hand);
-                }
-                else
-                {
-                    Cursor = Cursor.Default;
-                }
-            }
+            Cursor = GetCursorForPosition(mousePosition);
         }
 
         private void LimitImageWithinBounds()
@@ -299,6 +212,8 @@ namespace AvaloniaVisionControl
                     if (newPt.Count > 0)
                         element.Paint(context, m_lineWidthScale * _currentZoomFactor, newPt);
                 }
+
+                DrawElementEditHandles(context);
             }
         }
         //修改处：
@@ -381,7 +296,7 @@ namespace AvaloniaVisionControl
             
             // 释放资源
             _originImage?.Dispose();
-            //修改处：
+            ResetInteractionState();
             _originImage = null;
         }
     }

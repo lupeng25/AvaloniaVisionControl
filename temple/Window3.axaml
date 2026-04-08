@@ -1,30 +1,50 @@
-<Window xmlns="https://github.com/avaloniaui"
+﻿<Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:vision="using:AvaloniaVisionControl"
-        mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
+        mc:Ignorable="d"
+        d:DesignWidth="1200"
+        d:DesignHeight="820"
         x:Class="UserControlApp.Window3"
-        Title="Window3 - 图像显示控件测试">
+        Title="Window3 - Interaction Verification">
 
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
+            <RowDefinition Height="180"/>
         </Grid.RowDefinitions>
-        
-        <!-- 控制按钮区域 -->
-        <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="10">
-            <Button Name="BtnLoadImage" Content="加载图像" Margin="5" Click="BtnLoadImage_Click"/>
-            <Button Name="BtnAddElements" Content="添加图元" Margin="5" Click="BtnAddElements_Click"/>
-            <Button Name="BtnClearElements" Content="清除图元" Margin="5" Click="BtnClearElements_Click"/>
+
+        <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="10" Spacing="8">
+            <Button Name="BtnLoadImage" Content="Load Image" MinWidth="110" Click="BtnLoadImage_Click"/>
+            <Button Name="BtnAddElements" Content="Load Verification Shapes" MinWidth="180" Click="BtnAddElements_Click"/>
+            <Button Name="BtnClearElements" Content="Clear Shapes" MinWidth="110" Click="BtnClearElements_Click"/>
+            <TextBlock VerticalAlignment="Center"
+                       Margin="8,0,0,0"
+                       Text="Check: handle resize > element move > image pan; ImageClick should only fire on blank area."/>
         </StackPanel>
-        
-        <!-- 图像显示区域 -->
+
         <Border Grid.Row="1" BorderBrush="Gray" BorderThickness="1" Margin="10">
             <vision:CtlOnlyShowImage x:Name="ImageControl"/>
         </Border>
-    </Grid>
 
+        <Border Grid.Row="2" BorderBrush="Gray" BorderThickness="1" Margin="10,0,10,10" Padding="8">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                </Grid.RowDefinitions>
+                <TextBlock Text="Verification Log" FontWeight="Bold"/>
+                <TextBox x:Name="TxtLog"
+                         Grid.Row="1"
+                         Margin="0,6,0,0"
+                         IsReadOnly="True"
+                         AcceptsReturn="True"
+                         TextWrapping="Wrap"
+                         ScrollViewer.VerticalScrollBarVisibility="Auto"/>
+            </Grid>
+        </Border>
+    </Grid>
 </Window>
 

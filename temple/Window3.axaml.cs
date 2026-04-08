@@ -1,10 +1,6 @@
-using Avalonia;
+锘縰sing Avalonia;
 using Avalonia.Controls;
-using Avalonia.Data;
 using Avalonia.Interactivity;
-using Avalonia.Layout;
-using Avalonia.Markup.Xaml;
-using Avalonia.Markup.Xaml.Templates;
 using Avalonia.Media;
 using Avalonia.Media.Imaging;
 using AvaloniaVisionControl;
@@ -17,131 +13,159 @@ namespace UserControlApp;
 public partial class Window3 : Window
 {
     private CtlOnlyShowImage? _imageControl;
+    private TextBox? _logTextBox;
 
     public Window3()
     {
-        // 窗口基础设置
-        Title = "Window3 - 图像显示控件测试";
-        Width = 1024;
-        Height = 768;
+        Title = "Window3 - Interaction Verification";
+        Width = 1200;
+        Height = 820;
         WindowStartupLocation = WindowStartupLocation.CenterScreen;
 
         InitializeComponent();
-        
-        // 获取图像控件引用
+
         _imageControl = this.FindControl<CtlOnlyShowImage>("ImageControl");
-        
-        // 设置默认标定（示例：1像素 = 0.1mm）
+        _logTextBox = this.FindControl<TextBox>("TxtLog");
+
         if (_imageControl != null)
         {
-            var mmPerPixel = new Point(0.1, 0.1);
-            _imageControl.SetCameraCalib(mmPerPixel, 1024, 768);
+            _imageControl.SetCameraCalib(new Point(0.1, 0.1), 1024, 768);
+            _imageControl.CtlShowPaintStatus = ImageElementCtlStatus.ShowAll;
+            _imageControl.ImageClick += OnImageClick;
         }
+
+        Log("Ready. 1) Load an image 2) Load verification shapes 3) Validate resize/move/pan behavior.");
+        LoadVerificationShapes();
     }
 
-    /// <summary>
-    /// 加载图像按钮点击事件
-    /// </summary>
-    private async void BtnLoadImage_Click(object sender, RoutedEventArgs e)
+    protected override void OnClosed(EventArgs e)
+    {
+        if (_imageControl != null)
+        {
+            _imageControl.ImageClick -= OnImageClick;
+        }
+
+        base.OnClosed(e);
+    }
+
+    private void OnImageClick(object? sender, ImageClickEventArgs e)
+    {
+        Log($"ImageClick at image pixel ({e.ImagePosition.X:F1}, {e.ImagePosition.Y:F1}).");
+    }
+
+    private async void BtnLoadImage_Click(object? sender, RoutedEventArgs e)
     {
         try
         {
             var dialog = new OpenFileDialog
             {
-                Title = "选择图像文件",
+                Title = "Select image file",
                 Filters = new List<FileDialogFilter>
                 {
-                    new FileDialogFilter { Name = "图像文件", Extensions = new List<string> { "png", "jpg", "jpeg", "bmp" } },
-                    new FileDialogFilter { Name = "所有文件", Extensions = new List<string> { "*" } }
+                    new FileDialogFilter { Name = "Image Files", Extensions = new List<string> { "png", "jpg", "jpeg", "bmp" } },
+                    new FileDialogFilter { Name = "All Files", Extensions = new List<string> { "*" } }
                 }
             };
 
             var result = await dialog.ShowAsync(this);
-            if (result != null && result.Length > 0)
+            if (result == null || result.Length == 0)
             {
-                var filePath = result[0];
-                using var stream = File.OpenRead(filePath);
-                var bitmap = new Bitmap(stream);
-                
-                if (_imageControl != null)
-                {
-                    var eventArgs = new ReceiveBitmapEventArgs(0, bitmap);
-                    _imageControl.ShowImage(eventArgs);
-                }
+                Log("Load image canceled.");
+                return;
             }
+
+            var filePath = result[0];
+            using var stream = File.OpenRead(filePath);
+            var bitmap = new Bitmap(stream);
+
+            if (_imageControl != null)
+            {
+                _imageControl.ShowImage(new ReceiveBitmapEventArgs(0, bitmap));
+                _imageControl.ReFresh();
+            }
+
+            Log($"Image loaded: {Path.GetFileName(filePath)}");
         }
         catch (Exception ex)
         {
-            // 简单的错误提示
-            Console.WriteLine($"加载图像失败: {ex.Message}");
+            Log($"Load image failed: {ex.Message}");
         }
     }
 
-    /// <summary>
-    /// 添加图元按钮点击事件
-    /// </summary>
-    private void BtnAddElements_Click(object sender, RoutedEventArgs e)
+    private void BtnAddElements_Click(object? sender, RoutedEventArgs e)
     {
-        if (_imageControl == null) return;
+        LoadVerificationShapes();
+    }
 
-        var elements = new List<PaintElement>();
-
-        // 添加一个红色圆（机械坐标：中心 (10, 20)，半径 5mm）
-        elements.Add(new PaintElement
+    private void BtnClearElements_Click(object? sender, RoutedEventArgs e)
+    {
+        if (_imageControl == null)
         {
-            Type = PaintElementType.Circle,
-            Pts = new List<double> { 10.0, 20.0, 25.0, 20.0 },
-            Color = Colors.Red,
-            LineWidth = 2.0,
-            IsFill = false,
-            Visible = true
-        });
+            return;
+        }
 
-        // 添加一个绿色矩形
-        elements.Add(new PaintElement
-        {
-            Type = PaintElementType.Rectangle,
-            Pts = new List<double> { -20.0, -20.0, 20.0, 20.0 },
-            Color = Colors.Green,
-            LineWidth = 1.5,
-            IsFill = false,
-            Visible = true
-        });
+        _imageControl.SetPaintElements(new List<PaintElement>());
+        _imageControl.ReFresh();
+        Log("Shapes cleared.");
+    }
 
-        // 添加一个蓝色十字（中心点）
-        elements.Add(new PaintElement
+    private void LoadVerificationShapes()
+    {
+        if (_imageControl == null)
         {
-            Type = PaintElementType.Cross,
-            Pts = new List<double> { 0.0, 0.0 },
-            Color = Colors.Blue,
-            LineWidth = 2.0,
-            Visible = true
-        });
+            return;
+        }
 
-        // 添加文本
-        elements.Add(new PaintElement
+        var elements = new List<PaintElement>
         {
-            Type = PaintElementType.Text,
-            Pts = new List<double> { 0.0, -10.0 },  
-            Text = "测试图元",
-            FontSize = 16,
-            Color = Colors.Yellow, 
-            Visible = true
-        });
+            new PaintElement
+            {
+                Type = PaintElementType.Rectangle,
+                Pts = new List<double> { -30.0, -15.0, -5.0, 10.0 },
+                Color = Colors.Lime,
+                LineWidth = 2.0,
+                IsFill = false,
+                Visible = true
+            },
+            new PaintElement
+            {
+                Type = PaintElementType.Circle,
+                Pts = new List<double> { 15.0, 8.0, 22.0, 8.0 },
+                Color = Colors.OrangeRed,
+                LineWidth = 2.0,
+                IsFill = false,
+                Visible = true
+            }
+        };
 
         _imageControl.SetPaintElements(elements);
         _imageControl.CtlShowPaintStatus = ImageElementCtlStatus.ShowAll;
         _imageControl.ReFresh();
+
+        Log("Verification shapes loaded (1 rectangle + 1 circle).");
+        Log("Try rectangle: 8 handles resize, body move; circle: center handle move, edge handle resize.");
+        Log("ImageClick should appear only when clicking blank area.");
     }
 
-    /// <summary>
-    /// 清除图元按钮点击事件
-    /// </summary>
-    private void BtnClearElements_Click(object sender, RoutedEventArgs e)
+    private void Log(string message)
     {
-        if (_imageControl == null) return;
+        var line = $"[{DateTime.Now:HH:mm:ss}] {message}";
 
-        _imageControl.SetPaintElements(new List<PaintElement>());
-        _imageControl.ReFresh();
+        if (_logTextBox == null)
+        {
+            Console.WriteLine(line);
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(_logTextBox.Text))
+        {
+            _logTextBox.Text = line;
+        }
+        else
+        {
+            _logTextBox.Text += Environment.NewLine + line;
+        }
+
+        _logTextBox.CaretIndex = _logTextBox.Text?.Length ?? 0;
     }
 }
