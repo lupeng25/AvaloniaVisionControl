@@ -18,7 +18,13 @@
     <RepositoryType>git</RepositoryType>
     <PackageTags>avalonia;image;control;vision;display;ui;graphics</PackageTags>
     <PackageReadmeFile>README.md</PackageReadmeFile>
+    <NoWarn>$(NoWarn);CS1591</NoWarn>
   </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Remove="temple\**\*.cs" />
+    <AvaloniaXaml Remove="temple\**\*.axaml" />
+  </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="Avalonia" Version="11.3.3" />
@@ -31,4 +37,3 @@
   </ItemGroup>
 
 </Project>
-

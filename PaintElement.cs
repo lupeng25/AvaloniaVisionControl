@@ -342,8 +342,11 @@ namespace AvaloniaVisionControl
                     Size = new Size(radius, radius),
                     SweepDirection = SweepDirection.Clockwise
                 };
-                
+
+                figure.Segments ??= new PathSegments();
                 figure.Segments.Add(arcSegment);
+
+                geometry.Figures ??= new PathFigures();
                 geometry.Figures.Add(figure);
                 
                 context.DrawGeometry(null, pen, geometry);

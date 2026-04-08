@@ -512,6 +512,11 @@ namespace AvaloniaVisionControl
             double deltaImageY,
             double[] pixelToMachineMatrix)
         {
+            if (_originImage == null)
+            {
+                return false;
+            }
+
             if (!TryGetRectangleImageGeometry(element, out var p1Image, out var p2Image, out var normalizedRect))
             {
                 return false;
@@ -538,6 +543,11 @@ namespace AvaloniaVisionControl
             double deltaImageY,
             double[] pixelToMachineMatrix)
         {
+            if (_originImage == null)
+            {
+                return false;
+            }
+
             if (!TryGetCircleImageGeometry(element, out var centerImage, out var edgeImage, out var radius))
             {
                 return false;
@@ -569,6 +579,11 @@ namespace AvaloniaVisionControl
             double deltaImageY,
             double[] pixelToMachineMatrix)
         {
+            if (_originImage == null)
+            {
+                return false;
+            }
+
             if (!TryGetLineImageGeometry(element, out var startImage, out var endImage))
             {
                 return false;
@@ -599,6 +614,11 @@ namespace AvaloniaVisionControl
             double deltaImageY,
             double[] pixelToMachineMatrix)
         {
+            if (_originImage == null)
+            {
+                return false;
+            }
+
             if (!TryGetPolygonImagePoints(element, out var imagePoints) || imagePoints.Count < 3)
             {
                 return false;
@@ -642,6 +662,11 @@ namespace AvaloniaVisionControl
             double deltaImageY,
             double[] pixelToMachineMatrix)
         {
+            if (_originImage == null)
+            {
+                return false;
+            }
+
             if (!TryGetRectangleImageGeometry(element, out _, out _, out var normalizedRect))
             {
                 return false;
@@ -767,6 +792,11 @@ namespace AvaloniaVisionControl
             Point mousePosition,
             double[] pixelToMachineMatrix)
         {
+            if (_originImage == null)
+            {
+                return false;
+            }
+
             if (!TryGetCircleImageGeometry(element, out var centerImage, out var edgeImage, out var oldRadius))
             {
                 return false;

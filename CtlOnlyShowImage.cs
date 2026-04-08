@@ -14,7 +14,7 @@ namespace AvaloniaVisionControl
     /// </summary>
     public partial class CtlOnlyShowImage : Control, IShowPaintElement, IEditablePaintElement
     {
-        private Bitmap _originImage;
+        private Bitmap? _originImage;
         private double _currentZoomFactor = 1.0;
         private double _defZoomFactor = 1.0;
         private const double ZoomStep = 0.3;
@@ -37,7 +37,7 @@ namespace AvaloniaVisionControl
         /// 鼠标左键单击事件
         /// 当用户在图像上单击鼠标左键时触发，返回控件坐标与图像像素坐标
         /// </summary>
-        public event EventHandler<ImageClickEventArgs> ImageClick;
+        public event EventHandler<ImageClickEventArgs>? ImageClick;
 
         public event EventHandler<PaintElementChangedEventArgs>? ElementChanged;
 
@@ -122,7 +122,7 @@ namespace AvaloniaVisionControl
             HandlePointerReleased(e);
         }
 
-        private void OnDoubleTapped(object sender, RoutedEventArgs e)
+        private void OnDoubleTapped(object? sender, RoutedEventArgs e)
         {
             _currentZoomFactor = _defZoomFactor;
             _scrollImageLocation = new Point(0, 0);
