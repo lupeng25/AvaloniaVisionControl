@@ -10,6 +10,10 @@
 
 当前版本使用**纯图像像素坐标模式**。
 
+快速入口：
+
+- 使用文档（面向 UserControlApp/二次开发）：[USAGE.md](./USAGE.md)
+
 ## 1. 安装
 
 ### NuGet
@@ -280,3 +284,4 @@ dotnet pack -c Release
 ```
 
 默认输出到 `bin/Release`。
+

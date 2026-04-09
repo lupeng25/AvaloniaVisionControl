@@ -36,6 +36,11 @@ namespace AvaloniaVisionControl
                 nameof(AllowMouseScroll),
                 true);
 
+        public static readonly StyledProperty<bool> IsElementEditingEnabledProperty =
+            AvaloniaProperty.Register<CtlOnlyShowImage, bool>(
+                nameof(IsElementEditingEnabled),
+                true);
+
         public static readonly DirectProperty<CtlOnlyShowImage, int[]> NeedShowCamProperty =
             AvaloniaProperty.RegisterDirect<CtlOnlyShowImage, int[]>(
                 nameof(NeedShowCam),
@@ -49,6 +54,10 @@ namespace AvaloniaVisionControl
             {
                 control.InvalidateVisual();
             });
+            IsElementEditingEnabledProperty.Changed.AddClassHandler<CtlOnlyShowImage>((control, _) =>
+            {
+                control.InvalidateVisual();
+            });
         }
 
         /// <summary>
@@ -58,6 +67,15 @@ namespace AvaloniaVisionControl
         {
             get => GetValue(AllowMouseScrollProperty);
             set => SetValue(AllowMouseScrollProperty, value);
+        }
+
+        /// <summary>
+        /// 是否启用图元编辑交互。
+        /// </summary>
+        public bool IsElementEditingEnabled
+        {
+            get => GetValue(IsElementEditingEnabledProperty);
+            set => SetValue(IsElementEditingEnabledProperty, value);
         }
 
         /// <summary>
@@ -85,6 +103,18 @@ namespace AvaloniaVisionControl
         /// 当用户在图像上单击鼠标左键时触发，返回控件坐标与图像像素坐标
         /// </summary>
         public event EventHandler<ImageClickEventArgs>? ImageClick;
+
+        /// <summary>
+        /// 鼠标左键按下事件（图像区域内）。
+        /// 用于外部 ROI 绘制等交互起点采集。
+        /// </summary>
+        public event EventHandler<ImageClickEventArgs>? ImageMouseDown;
+
+        /// <summary>
+        /// 鼠标左键释放事件。
+        /// 用于外部 ROI 绘制等交互终点采集。
+        /// </summary>
+        public event EventHandler<ImageClickEventArgs>? ImageMouseUp;
 
         public event EventHandler<PaintElementChangedEventArgs>? ElementChanged;
 
@@ -184,6 +214,42 @@ namespace AvaloniaVisionControl
             HandlePointerReleased(e);
         }
 
+        protected override void OnKeyDown(KeyEventArgs e)
+        {
+            base.OnKeyDown(e);
+
+            if (!IsElementEditingEnabled)
+            {
+                return;
+            }
+
+            if (e.Key == Key.Delete)
+            {
+                if (_selectedElementIndex >= 0)
+                {
+                    RemovePaintElementAt(_selectedElementIndex);
+                    e.Handled = true;
+                }
+
+                return;
+            }
+
+            if (e.Key == Key.Escape)
+            {
+                if (TryCancelCurrentInteraction())
+                {
+                    e.Handled = true;
+                    return;
+                }
+
+                if (_selectedElementIndex >= 0)
+                {
+                    SetSelectedElementIndex(-1);
+                    e.Handled = true;
+                }
+            }
+        }
+
         private void OnDoubleTapped(object? sender, RoutedEventArgs e)
         {
             UpdateViewportState(resetToFit: true);
@@ -261,7 +327,13 @@ namespace AvaloniaVisionControl
                     var element = m_CurrShowElement[i];
                     var newPt = GetTransedPts(element.Pts);
                     if (newPt.Count > 0)
+                    {
                         element.Paint(context, m_lineWidthScale * _currentZoomFactor, newPt);
+                        if (i == _selectedElementIndex)
+                        {
+                            DrawSelectedElementAdornment(context, element, newPt);
+                        }
+                    }
                 }
 
                 DrawElementEditHandles(context);

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
@@ -74,7 +75,6 @@ namespace AvaloniaVisionControl
         private Point _interactionPressPoint;
         private Point _interactionLastPoint;
         private bool _interactionMoved;
-        private bool _suppressImageClickForCurrentPress;
         private PaintElement? _interactionInitialElementSnapshot;
         private PaintElement? _interactionLastPreviewElementSnapshot;
         private bool _interactionElementChanged;
@@ -84,9 +84,13 @@ namespace AvaloniaVisionControl
         private const double ElementHitTolerance = 4.0;
         private const double MinRectSizePixels = 8.0;
         private const double MinCircleRadiusPixels = 4.0;
+        private const double MinPointHitTolerance = 6.0;
 
         private static readonly IBrush HandleFillBrush = new SolidColorBrush(Color.FromArgb(220, 255, 255, 255));
         private static readonly IPen HandleBorderPen = new Pen(new SolidColorBrush(Color.FromArgb(255, 30, 30, 30)), 1);
+        private static readonly IPen SelectedAdornmentPen = new Pen(
+            new SolidColorBrush(Color.FromArgb(255, 0, 255, 255)),
+            2);
 
         private void HandlePointerPressed(PointerPressedEventArgs e)
         {
@@ -103,16 +107,18 @@ namespace AvaloniaVisionControl
                 return;
             }
 
+            var pressImagePos = ClampPointToImage(ControlToImagePoint(mousePos));
+            ImageMouseDown?.Invoke(this, new ImageClickEventArgs(mousePos, pressImagePos));
+
             Focus();
             _interactionPressPoint = mousePos;
             _interactionLastPoint = mousePos;
             _interactionMoved = false;
-            _suppressImageClickForCurrentPress = false;
             _interactionElementChanged = false;
             _interactionInitialElementSnapshot = null;
             _interactionLastPreviewElementSnapshot = null;
 
-            if (TryHitTestHandle(mousePos, out var handleHit))
+            if (IsElementEditingEnabled && TryHitTestHandle(mousePos, out var handleHit))
             {
                 TrySetSelectedElementIndexInternal(handleHit.ElementIndex, PaintElementChangeSource.Interaction);
 
@@ -120,7 +126,6 @@ namespace AvaloniaVisionControl
                 _activeElementIndex = handleHit.ElementIndex;
                 _activeHandleType = handleHit.HandleType;
                 _activeHandleVertexIndex = handleHit.VertexIndex;
-                _suppressImageClickForCurrentPress = true;
                 CtlMouseStatus = ImageCtlMouseStatus.Dragging;
                 Cursor = GetCursorForHandle(handleHit.HandleType);
                 _interactionInitialElementSnapshot = CloneElementAt(_activeElementIndex);
@@ -129,7 +134,7 @@ namespace AvaloniaVisionControl
                 return;
             }
 
-            if (TryHitTestElementBody(mousePos, out int bodyIndex))
+            if (IsElementEditingEnabled && TryHitTestElementBody(mousePos, out int bodyIndex))
             {
                 TrySetSelectedElementIndexInternal(bodyIndex, PaintElementChangeSource.Interaction);
 
@@ -137,7 +142,6 @@ namespace AvaloniaVisionControl
                 _activeElementIndex = bodyIndex;
                 _activeHandleType = ElementHandleType.None;
                 _activeHandleVertexIndex = -1;
-                _suppressImageClickForCurrentPress = true;
                 CtlMouseStatus = ImageCtlMouseStatus.Dragging;
                 Cursor = new Cursor(StandardCursorType.SizeAll);
                 _interactionInitialElementSnapshot = CloneElementAt(_activeElementIndex);
@@ -146,7 +150,6 @@ namespace AvaloniaVisionControl
                 return;
             }
 
-            TrySetSelectedElementIndexInternal(-1, PaintElementChangeSource.Interaction);
             _interactionMode = EditInteractionMode.PanningImage;
             _activeElementIndex = -1;
             _activeHandleType = ElementHandleType.None;
@@ -225,10 +228,13 @@ namespace AvaloniaVisionControl
             }
 
             var mousePos = e.GetPosition(this);
-            bool shouldRaiseImageClick =
-                _interactionMode == EditInteractionMode.PanningImage &&
-                !_suppressImageClickForCurrentPress &&
-                !_interactionMoved;
+            if (_originImage != null)
+            {
+                var releaseImagePos = ClampPointToImage(ControlToImagePoint(mousePos));
+                ImageMouseUp?.Invoke(this, new ImageClickEventArgs(mousePos, releaseImagePos));
+            }
+
+            bool shouldRaiseImageClick = !_interactionMoved;
 
             if (shouldRaiseImageClick && _originImage != null && GetImageRectangle().Contains(mousePos))
             {
@@ -262,6 +268,13 @@ namespace AvaloniaVisionControl
             if (_interactionMode == EditInteractionMode.PanningImage)
             {
                 return new Cursor(StandardCursorType.Hand);
+            }
+
+            if (!IsElementEditingEnabled)
+            {
+                return GetImageRectangle().Contains(mousePosition)
+                    ? new Cursor(StandardCursorType.Hand)
+                    : Cursor.Default;
             }
 
             if (TryHitTestHandle(mousePosition, out var handleHit))
@@ -316,7 +329,7 @@ namespace AvaloniaVisionControl
             }
 
             var element = m_CurrShowElement[i];
-            if (!IsEditableElement(element))
+            if (!IsHandleEditableElement(element))
             {
                 hitResult = default;
                 return false;
@@ -346,7 +359,7 @@ namespace AvaloniaVisionControl
                 }
 
                 var element = m_CurrShowElement[i];
-                if (!IsEditableElement(element))
+                if (!IsMovableElement(element))
                 {
                     continue;
                 }
@@ -397,6 +410,35 @@ namespace AvaloniaVisionControl
                 {
                     if (IsPointInPolygon(mousePosition, polygonPoints) ||
                         IsPointNearPolygonEdge(mousePosition, polygonPoints, ElementHitTolerance))
+                    {
+                        elementIndex = i;
+                        return true;
+                    }
+                }
+                else if (element.Type == PaintElementType.Text &&
+                         TryGetTextControlRect(element, out var textRect))
+                {
+                    if (InflateRect(textRect, ElementHitTolerance).Contains(mousePosition))
+                    {
+                        elementIndex = i;
+                        return true;
+                    }
+                }
+                else if (element.Type == PaintElementType.Cross &&
+                         TryGetSinglePointControlPosition(element, out var crossCenter))
+                {
+                    double hitTolerance = Math.Max(ElementHitTolerance, MinPointHitTolerance) + element.LineWidth * _currentZoomFactor * 3;
+                    if (GetHandleRect(crossCenter, hitTolerance * 2).Contains(mousePosition))
+                    {
+                        elementIndex = i;
+                        return true;
+                    }
+                }
+                else if (element.Type == PaintElementType.Point &&
+                         TryGetSinglePointControlPosition(element, out var pointCenter))
+                {
+                    double hitTolerance = Math.Max(ElementHitTolerance, MinPointHitTolerance) + element.LineWidth * _currentZoomFactor * 2;
+                    if (GetHandleRect(pointCenter, hitTolerance * 2).Contains(mousePosition))
                     {
                         elementIndex = i;
                         return true;
@@ -465,8 +507,48 @@ namespace AvaloniaVisionControl
                     deltaImageX,
                     deltaImageY,
                     pixelToMachineMatrix),
+                PaintElementType.Text => TryMovePointBasedElement(
+                    element,
+                    deltaImageX,
+                    deltaImageY,
+                    pixelToMachineMatrix),
+                PaintElementType.Cross => TryMovePointBasedElement(
+                    element,
+                    deltaImageX,
+                    deltaImageY,
+                    pixelToMachineMatrix),
+                PaintElementType.Point => TryMovePointBasedElement(
+                    element,
+                    deltaImageX,
+                    deltaImageY,
+                    pixelToMachineMatrix),
                 _ => false
             };
+        }
+
+        private bool TryMovePointBasedElement(
+            PaintElement element,
+            double deltaImageX,
+            double deltaImageY,
+            double[] pixelToMachineMatrix)
+        {
+            if (element.Pts.Count < 2)
+            {
+                return false;
+            }
+
+            var newPts = new List<double>(element.Pts.Count);
+            for (int i = 0; i < element.Pts.Count; i += 2)
+            {
+                var imagePoint = MachineToImagePoint(new Point(element.Pts[i], element.Pts[i + 1]));
+                var movedPoint = new Point(imagePoint.X + deltaImageX, imagePoint.Y + deltaImageY);
+                var machinePoint = ImageToMachinePoint(movedPoint, pixelToMachineMatrix);
+                newPts.Add(machinePoint.X);
+                newPts.Add(machinePoint.Y);
+            }
+
+            element.Pts = newPts;
+            return true;
         }
 
         private bool TryResizeActiveElement(Point mousePosition, double deltaControlX, double deltaControlY)
@@ -1154,6 +1236,11 @@ namespace AvaloniaVisionControl
         private List<HandlePoint> GetHandlePoints(PaintElement element)
         {
             var handlePoints = new List<HandlePoint>();
+            if (!IsHandleEditableElement(element))
+            {
+                return handlePoints;
+            }
+
             if ((element.Type == PaintElementType.Rectangle || element.Type == PaintElementType.Ellipse) &&
                 TryGetRectangleControlRect(element, out var rect))
             {
@@ -1210,20 +1297,37 @@ namespace AvaloniaVisionControl
                 ElementHandleType.RectLeft;
         }
 
-        private static bool IsEditableElement(PaintElement element)
+        private static bool IsMovableElement(PaintElement element)
         {
             return element.Visible &&
-                   element.Pts.Count >= 4 &&
-                    element.Type switch
-                    {
-                        PaintElementType.Rectangle => element.Pts.Count >= 4,
-                        PaintElementType.Ellipse => element.Pts.Count >= 4,
-                        PaintElementType.Circle => element.Pts.Count >= 4,
-                        PaintElementType.Line => element.Pts.Count >= 4,
-                        PaintElementType.Arrow => element.Pts.Count >= 4,
-                        PaintElementType.Polygon => element.Pts.Count >= 6 && element.Pts.Count % 2 == 0,
-                        _ => false
-                    };
+                element.Type switch
+                {
+                    PaintElementType.Rectangle => element.Pts.Count >= 4,
+                    PaintElementType.Ellipse => element.Pts.Count >= 4,
+                    PaintElementType.Circle => element.Pts.Count >= 4,
+                    PaintElementType.Line => element.Pts.Count >= 4,
+                    PaintElementType.Arrow => element.Pts.Count >= 4,
+                    PaintElementType.Polygon => element.Pts.Count >= 6 && element.Pts.Count % 2 == 0,
+                    PaintElementType.Text => element.Pts.Count >= 2,
+                    PaintElementType.Cross => element.Pts.Count >= 2,
+                    PaintElementType.Point => element.Pts.Count >= 2,
+                    _ => false
+                };
+        }
+
+        private static bool IsHandleEditableElement(PaintElement element)
+        {
+            return element.Visible &&
+                element.Type switch
+                {
+                    PaintElementType.Rectangle => element.Pts.Count >= 4,
+                    PaintElementType.Ellipse => element.Pts.Count >= 4,
+                    PaintElementType.Circle => element.Pts.Count >= 4,
+                    PaintElementType.Line => element.Pts.Count >= 4,
+                    PaintElementType.Arrow => element.Pts.Count >= 4,
+                    PaintElementType.Polygon => element.Pts.Count >= 6 && element.Pts.Count % 2 == 0,
+                    _ => false
+                };
         }
 
         private bool TryGetPixelToMachineMatrix(out double[] pixelToMachineMatrix)
@@ -1310,7 +1414,7 @@ namespace AvaloniaVisionControl
 
         private void DrawElementEditHandles(DrawingContext context)
         {
-            if (_originImage == null || CtlShowPaintStatus <= 0 || m_CurrShowElement.Count == 0)
+            if (_originImage == null || CtlShowPaintStatus <= 0 || m_CurrShowElement.Count == 0 || !IsElementEditingEnabled)
             {
                 return;
             }
@@ -1326,7 +1430,7 @@ namespace AvaloniaVisionControl
             }
 
             var element = m_CurrShowElement[_selectedElementIndex];
-            if (!IsEditableElement(element))
+            if (!IsHandleEditableElement(element))
             {
                 return;
             }
@@ -1348,11 +1452,126 @@ namespace AvaloniaVisionControl
             _activeHandleType = ElementHandleType.None;
             _activeHandleVertexIndex = -1;
             _interactionMoved = false;
-            _suppressImageClickForCurrentPress = false;
             _interactionInitialElementSnapshot = null;
             _interactionLastPreviewElementSnapshot = null;
             _interactionElementChanged = false;
             CtlMouseStatus = ImageCtlMouseStatus.Normal;
+        }
+
+        private bool TryCancelCurrentInteraction()
+        {
+            if (_interactionMode == EditInteractionMode.MovingElement ||
+                _interactionMode == EditInteractionMode.ResizingElement)
+            {
+                if (IsIndexValid(_activeElementIndex) && _interactionInitialElementSnapshot != null)
+                {
+                    m_CurrShowElement[_activeElementIndex] = _interactionInitialElementSnapshot.DeepCopy();
+                }
+
+                ResetInteractionState();
+                InvalidateVisual();
+                UpdateCursorStyle(_interactionLastPoint);
+                return true;
+            }
+
+            return false;
+        }
+
+        private bool TryGetSinglePointControlPosition(PaintElement element, out Point point)
+        {
+            point = default;
+            if (element.Pts.Count < 2)
+            {
+                return false;
+            }
+
+            point = MachineToControlPoint(new Point(element.Pts[0], element.Pts[1]));
+            return true;
+        }
+
+        private bool TryGetTextControlRect(PaintElement element, out Rect rect)
+        {
+            rect = default;
+            if (element.Type != PaintElementType.Text ||
+                element.Pts.Count < 2 ||
+                string.IsNullOrEmpty(element.Text))
+            {
+                return false;
+            }
+
+            var origin = MachineToControlPoint(new Point(element.Pts[0], element.Pts[1]));
+            var formattedText = new FormattedText(
+                element.Text,
+                CultureInfo.CurrentCulture,
+                FlowDirection.LeftToRight,
+                new Typeface("Microsoft YaHei"),
+                Math.Max(1.0, element.FontSize),
+                Brushes.White);
+            rect = new Rect(origin, new Size(formattedText.Width, formattedText.Height));
+            return true;
+        }
+
+        private void DrawSelectedElementAdornment(DrawingContext context, PaintElement element, List<float> transformedPts)
+        {
+            if (_selectedElementIndex < 0 || transformedPts.Count < 2)
+            {
+                return;
+            }
+
+            switch (element.Type)
+            {
+                case PaintElementType.Rectangle:
+                    if (TryGetRectangleControlRect(element, out var rect))
+                    {
+                        context.DrawRectangle(null, SelectedAdornmentPen, InflateRect(rect, 2));
+                    }
+                    break;
+                case PaintElementType.Ellipse:
+                    if (TryGetRectangleControlRect(element, out var ellipseRect))
+                    {
+                        var center = new Point(ellipseRect.Center.X, ellipseRect.Center.Y);
+                        context.DrawEllipse(
+                            null,
+                            SelectedAdornmentPen,
+                            center,
+                            ellipseRect.Width / 2.0 + 2,
+                            ellipseRect.Height / 2.0 + 2);
+                    }
+                    break;
+                case PaintElementType.Circle:
+                    if (TryGetCircleControlGeometry(element, out var circleCenter, out var edge))
+                    {
+                        context.DrawEllipse(null, SelectedAdornmentPen, circleCenter, Distance(circleCenter, edge) + 2, Distance(circleCenter, edge) + 2);
+                    }
+                    break;
+                case PaintElementType.Line:
+                case PaintElementType.Arrow:
+                    if (TryGetLineControlGeometry(element, out var lineStart, out var lineEnd))
+                    {
+                        context.DrawLine(SelectedAdornmentPen, lineStart, lineEnd);
+                    }
+                    break;
+                case PaintElementType.Polygon:
+                    if (TryGetPolygonControlPoints(element, out var polygonPoints) && polygonPoints.Count >= 3)
+                    {
+                        var geometry = new PolylineGeometry(polygonPoints, true);
+                        context.DrawGeometry(null, SelectedAdornmentPen, geometry);
+                    }
+                    break;
+                case PaintElementType.Text:
+                    if (TryGetTextControlRect(element, out var textRect))
+                    {
+                        context.DrawRectangle(null, SelectedAdornmentPen, InflateRect(textRect, 3));
+                    }
+                    break;
+                case PaintElementType.Cross:
+                case PaintElementType.Point:
+                    if (TryGetSinglePointControlPosition(element, out var pointCenter))
+                    {
+                        context.DrawEllipse(null, SelectedAdornmentPen, pointCenter, 10, 10);
+                    }
+                    break;
+            }
         }
 
         private void RaiseInteractionPreviewChanged()
