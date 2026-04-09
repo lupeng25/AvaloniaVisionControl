@@ -252,6 +252,13 @@ namespace AvaloniaVisionControl
 
         private void OnDoubleTapped(object? sender, RoutedEventArgs e)
         {
+            // New behavior: double-click clears current ROI selection first.
+            if (IsElementEditingEnabled && _selectedElementIndex >= 0)
+            {
+                SetSelectedElementIndex(-1);
+                return;
+            }
+
             UpdateViewportState(resetToFit: true);
             InvalidateVisual();
         }
