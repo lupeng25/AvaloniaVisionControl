@@ -188,6 +188,30 @@ imageControl.ReFresh();
 - 线段/箭头：起点与终点句柄
 - 多边形：顶点句柄
 
+### 6.1 单个 ROI 的可编辑控制
+
+每个 `PaintElement` 支持独立编辑开关：
+
+- `IsEditable = true`：允许交互编辑（拖拽、缩放句柄、键盘 Delete 删除）
+- `IsEditable = false`：禁止该 ROI 的交互编辑
+
+示例（文本 ROI 禁止编辑）：
+
+```csharp
+var textRoi = new PaintElement
+{
+    Type = PaintElementType.Text,
+    Pts = new List<double> { 80, 40 },
+    Text = "Label",
+    FontSize = 16,
+    Color = Colors.Yellow,
+    Visible = true,
+    IsEditable = false
+};
+```
+
+`ImageControlHelper` 也支持快速设置：`CreateText(...)` 默认 `isEditable = false`。
+
 ## 7. 事件
 
 ### 7.1 `ImageClick`

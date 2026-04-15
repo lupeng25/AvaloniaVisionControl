@@ -43,7 +43,7 @@ namespace AvaloniaVisionControl
         /// </summary>
         public static PaintElement CreateCircle(
             double centerX, double centerY, double radius,
-            Color color, double lineWidth = 2.0, bool isFill = false)
+            Color color, double lineWidth = 2.0, bool isFill = false, bool isEditable = true)
         {
             return new PaintElement
             {
@@ -52,6 +52,7 @@ namespace AvaloniaVisionControl
                 Color = color,
                 LineWidth = lineWidth,
                 IsFill = isFill,
+                IsEditable = isEditable,
                 Visible = true
             };
         }
@@ -61,7 +62,7 @@ namespace AvaloniaVisionControl
         /// </summary>
         public static PaintElement CreateLine(
             double x1, double y1, double x2, double y2,
-            Color color, double lineWidth = 2.0)
+            Color color, double lineWidth = 2.0, bool isEditable = true)
         {
             return new PaintElement
             {
@@ -69,6 +70,7 @@ namespace AvaloniaVisionControl
                 Pts = new List<double> { x1, y1, x2, y2 },
                 Color = color,
                 LineWidth = lineWidth,
+                IsEditable = isEditable,
                 Visible = true
             };
         }
@@ -78,7 +80,7 @@ namespace AvaloniaVisionControl
         /// </summary>
         public static PaintElement CreateRectangle(
             double x1, double y1, double x2, double y2,
-            Color color, double lineWidth = 2.0, bool isFill = false)
+            Color color, double lineWidth = 2.0, bool isFill = false, bool isEditable = true)
         {
             return new PaintElement
             {
@@ -87,6 +89,7 @@ namespace AvaloniaVisionControl
                 Color = color,
                 LineWidth = lineWidth,
                 IsFill = isFill,
+                IsEditable = isEditable,
                 Visible = true
             };
         }
@@ -95,7 +98,7 @@ namespace AvaloniaVisionControl
         /// 快速创建十字图元
         /// </summary>
         public static PaintElement CreateCross(
-            double x, double y, Color color, double lineWidth = 2.0)
+            double x, double y, Color color, double lineWidth = 2.0, bool isEditable = true)
         {
             return new PaintElement
             {
@@ -103,6 +106,7 @@ namespace AvaloniaVisionControl
                 Pts = new List<double> { x, y },
                 Color = color,
                 LineWidth = lineWidth,
+                IsEditable = isEditable,
                 Visible = true
             };
         }
@@ -111,7 +115,7 @@ namespace AvaloniaVisionControl
         /// 快速创建点图元
         /// </summary>
         public static PaintElement CreatePoint(
-            double x, double y, Color color, double size = 3.0)
+            double x, double y, Color color, double size = 3.0, bool isEditable = true)
         {
             return new PaintElement
             {
@@ -119,6 +123,7 @@ namespace AvaloniaVisionControl
                 Pts = new List<double> { x, y },
                 Color = color,
                 LineWidth = size,
+                IsEditable = isEditable,
                 Visible = true
             };
         }
@@ -127,7 +132,7 @@ namespace AvaloniaVisionControl
         /// 快速创建文本图元
         /// </summary>
         public static PaintElement CreateText(
-            double x, double y, string text, Color color, double fontSize = 12.0)
+            double x, double y, string text, Color color, double fontSize = 12.0, bool isEditable = false)
         {
             return new PaintElement
             {
@@ -136,6 +141,7 @@ namespace AvaloniaVisionControl
                 Text = text,
                 FontSize = fontSize,
                 Color = color,
+                IsEditable = isEditable,
                 Visible = true
             };
         }
@@ -145,7 +151,7 @@ namespace AvaloniaVisionControl
         /// </summary>
         public static PaintElement CreateArrow(
             double x1, double y1, double x2, double y2,
-            Color color, double lineWidth = 2.0)
+            Color color, double lineWidth = 2.0, bool isEditable = true)
         {
             return new PaintElement
             {
@@ -153,6 +159,7 @@ namespace AvaloniaVisionControl
                 Pts = new List<double> { x1, y1, x2, y2 },
                 Color = color,
                 LineWidth = lineWidth,
+                IsEditable = isEditable,
                 Visible = true
             };
         }

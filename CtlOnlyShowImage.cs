@@ -225,7 +225,8 @@ namespace AvaloniaVisionControl
 
             if (e.Key == Key.Delete)
             {
-                if (_selectedElementIndex >= 0)
+                if (IsIndexValid(_selectedElementIndex) &&
+                    m_CurrShowElement[_selectedElementIndex].IsEditable)
                 {
                     RemovePaintElementAt(_selectedElementIndex);
                     e.Handled = true;

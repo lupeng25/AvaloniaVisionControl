@@ -1300,6 +1300,7 @@ namespace AvaloniaVisionControl
         private static bool IsMovableElement(PaintElement element)
         {
             return element.Visible &&
+                element.IsEditable &&
                 element.Type switch
                 {
                     PaintElementType.Rectangle => element.Pts.Count >= 4,
@@ -1318,6 +1319,7 @@ namespace AvaloniaVisionControl
         private static bool IsHandleEditableElement(PaintElement element)
         {
             return element.Visible &&
+                element.IsEditable &&
                 element.Type switch
                 {
                     PaintElementType.Rectangle => element.Pts.Count >= 4,
@@ -1652,6 +1654,7 @@ namespace AvaloniaVisionControl
                 left.Text != right.Text ||
                 left.FontSize != right.FontSize ||
                 left.Visible != right.Visible ||
+                left.IsEditable != right.IsEditable ||
                 left.Pts.Count != right.Pts.Count)
             {
                 return false;

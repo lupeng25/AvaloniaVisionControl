@@ -64,6 +64,11 @@ namespace AvaloniaVisionControl
         /// </summary>
         public bool Visible { get; set; }
 
+        /// <summary>
+        /// 是否允许交互编辑（拖拽、缩放句柄、键盘删除）。
+        /// </summary>
+        public bool IsEditable { get; set; }
+
         public PaintElement()
         {
             Pts = new List<double>();
@@ -71,6 +76,7 @@ namespace AvaloniaVisionControl
             Color = Colors.Red;
             IsFill = false;
             Visible = true;
+            IsEditable = true;
             FontSize = 12;
             Text = string.Empty;
         }
@@ -89,7 +95,8 @@ namespace AvaloniaVisionControl
                 IsFill = IsFill,
                 Text = Text,
                 FontSize = FontSize,
-                Visible = Visible
+                Visible = Visible,
+                IsEditable = IsEditable
             };
         }
 
