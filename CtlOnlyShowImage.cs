@@ -223,6 +223,50 @@ namespace AvaloniaVisionControl
                 return;
             }
 
+            bool isCtrlPressed = (e.KeyModifiers & KeyModifiers.Control) == KeyModifiers.Control;
+            if (isCtrlPressed)
+            {
+                if (e.Key == Key.Z)
+                {
+                    if (Undo())
+                    {
+                        e.Handled = true;
+                    }
+
+                    return;
+                }
+
+                if (e.Key == Key.Y)
+                {
+                    if (Redo())
+                    {
+                        e.Handled = true;
+                    }
+
+                    return;
+                }
+
+                if (e.Key == Key.C)
+                {
+                    if (CopySelectedElement())
+                    {
+                        e.Handled = true;
+                    }
+
+                    return;
+                }
+
+                if (e.Key == Key.V)
+                {
+                    if (PasteCopiedElement())
+                    {
+                        e.Handled = true;
+                    }
+
+                    return;
+                }
+            }
+
             if (e.Key == Key.Delete)
             {
                 if (IsIndexValid(_selectedElementIndex) &&

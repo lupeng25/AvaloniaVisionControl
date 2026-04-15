@@ -144,6 +144,26 @@ imageControl.IsElementEditingEnabled = true;
 - `false`：禁止图元编辑，但仍允许图像滚轮缩放、平移、双击复位
 - 编辑关闭时不显示编辑句柄
 
+### 5.1.1 单个 ROI 可编辑控制
+
+每个图元都可独立控制：
+
+- `IsEditable = true`：允许交互编辑
+- `IsEditable = false`：禁止该 ROI 的交互编辑（拖拽、句柄、Delete）
+
+示例：
+
+```csharp
+new PaintElement
+{
+    Type = PaintElementType.Text,
+    Pts = new List<double> { 80, 40 },
+    Text = "固定文本",
+    IsEditable = false,
+    Visible = true
+};
+```
+
 ### 5.2 可拖动/可编辑图元
 
 当前支持“选中 + 拖动 + 改大小”的图元：
@@ -178,10 +198,19 @@ imageControl.IsElementEditingEnabled = true;
 
 当控件获得焦点且 `IsElementEditingEnabled = true` 时：
 
+- `Ctrl+Z`：撤销（Undo）
+- `Ctrl+Y`：重做（Redo）
+- `Ctrl+C`：复制当前选中图元（会话内）
+- `Ctrl+V`：粘贴图元副本（坐标偏移 `+10,+10`）
 - `Delete`：删除当前选中图元
 - `Escape`：
   - 若当前正在拖动/缩放，取消本次交互并回滚
   - 若当前没有活动交互但存在选中图元，则清空选择
+
+说明：
+
+- 复制/粘贴范围为当前控件实例会话，不走系统剪贴板。
+- `IsEditable = false` 的图元不会被交互编辑或键盘删除。
 
 ## 6. 事件与回调
 
@@ -232,6 +261,17 @@ imageControl.ImageMouseUp += (s, e) =>
 - `ImageMouseDown`：左键在图像区域内按下时触发
 - `ImageMouseUp`：左键释放时触发（坐标会裁剪到图像范围）
 
+### 6.4 历史状态事件
+
+```csharp
+imageControl.HistoryStateChanged += (s, e) =>
+{
+    // 可用于刷新工具栏按钮状态（Undo/Redo 是否可用）
+    bool canUndo = imageControl.CanUndo;
+    bool canRedo = imageControl.CanRedo;
+};
+```
+
 ## 7. 常用 API 清单
 
 - 图像：
@@ -252,6 +292,12 @@ imageControl.ImageMouseUp += (s, e) =>
   - `SetSelectedElementIndex(...)`
   - `GetSelectedElementIndex()`
   - `ReFresh()`
+  - `CanUndo` / `CanRedo`
+  - `MaxHistoryEntries`
+  - `Undo()`
+  - `Redo()`
+  - `CopySelectedElement()`
+  - `PasteCopiedElement()`
 - 交互：
   - `IsElementEditingEnabled`（属性）
 

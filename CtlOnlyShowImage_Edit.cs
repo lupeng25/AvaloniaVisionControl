@@ -1636,6 +1636,10 @@ namespace AvaloniaVisionControl
                 return;
             }
 
+            List<PaintElement> beforeElements = CloneCurrentElements();
+            beforeElements[_activeElementIndex] = _interactionInitialElementSnapshot.DeepCopy();
+            int selectedIndex = _selectedElementIndex;
+
             RaiseElementChanged(
                 PaintElementChangeAction.Updated,
                 _activeElementIndex,
@@ -1643,6 +1647,13 @@ namespace AvaloniaVisionControl
                 current,
                 PaintElementChangeSource.Interaction,
                 PaintElementChangePhase.Committed);
+
+            RecordHistoryCommittedChange(
+                PaintElementChangeAction.Updated,
+                beforeElements,
+                selectedIndex,
+                CloneCurrentElements(),
+                selectedIndex);
         }
 
         private static bool AreElementsEquivalent(PaintElement left, PaintElement right)

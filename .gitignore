@@ -34,3 +34,4 @@ CMakeCache.txt
 *.editorconfig
 /bin/*
 /obj/*
+/nupkg_tmp/

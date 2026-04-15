@@ -180,6 +180,9 @@ namespace AvaloniaVisionControl
                 return InvalidParameterCode;
             }
 
+            List<PaintElement> beforeElements = CloneCurrentElements();
+            int beforeSelectedIndex = _selectedElementIndex;
+
             var newElements = new List<PaintElement>(needShowElement.Count);
             foreach (var element in needShowElement)
             {
@@ -212,6 +215,14 @@ namespace AvaloniaVisionControl
                 PaintElementChangeSource.Api);
 
             InvalidateVisual();
+
+            RecordHistoryCommittedChange(
+                PaintElementChangeAction.Replaced,
+                beforeElements,
+                beforeSelectedIndex,
+                CloneCurrentElements(),
+                _selectedElementIndex);
+
             return SuccessCode;
         }
 
@@ -230,6 +241,8 @@ namespace AvaloniaVisionControl
                 return InvalidParameterCode;
             }
 
+            List<PaintElement> beforeElements = CloneCurrentElements();
+            int beforeSelectedIndex = _selectedElementIndex;
             var before = m_CurrShowElement[index].DeepCopy();
             m_CurrShowElement[index] = clone!;
 
@@ -242,6 +255,14 @@ namespace AvaloniaVisionControl
                 PaintElementChangePhase.Committed);
 
             InvalidateVisual();
+
+            RecordHistoryCommittedChange(
+                PaintElementChangeAction.Updated,
+                beforeElements,
+                beforeSelectedIndex,
+                CloneCurrentElements(),
+                _selectedElementIndex);
+
             return SuccessCode;
         }
 
@@ -252,6 +273,8 @@ namespace AvaloniaVisionControl
                 return InvalidParameterCode;
             }
 
+            List<PaintElement> beforeElements = CloneCurrentElements();
+            int beforeSelectedIndex = _selectedElementIndex;
             m_CurrShowElement.Add(clone!);
             int index = m_CurrShowElement.Count - 1;
             RaiseElementChanged(
@@ -263,6 +286,14 @@ namespace AvaloniaVisionControl
                 PaintElementChangePhase.Committed);
 
             InvalidateVisual();
+
+            RecordHistoryCommittedChange(
+                PaintElementChangeAction.Added,
+                beforeElements,
+                beforeSelectedIndex,
+                CloneCurrentElements(),
+                _selectedElementIndex);
+
             return SuccessCode;
         }
 
@@ -278,6 +309,8 @@ namespace AvaloniaVisionControl
                 return InvalidParameterCode;
             }
 
+            List<PaintElement> beforeElements = CloneCurrentElements();
+            int beforeSelectedIndex = _selectedElementIndex;
             m_CurrShowElement.Insert(index, clone!);
             int previousSelected = _selectedElementIndex;
             if (_selectedElementIndex >= index)
@@ -296,6 +329,14 @@ namespace AvaloniaVisionControl
             RaiseSelectionChangedIfNeeded(previousSelected, _selectedElementIndex, PaintElementChangeSource.Api);
 
             InvalidateVisual();
+
+            RecordHistoryCommittedChange(
+                PaintElementChangeAction.Added,
+                beforeElements,
+                beforeSelectedIndex,
+                CloneCurrentElements(),
+                _selectedElementIndex);
+
             return SuccessCode;
         }
 
@@ -306,6 +347,8 @@ namespace AvaloniaVisionControl
                 return OutOfRangeCode;
             }
 
+            List<PaintElement> beforeElements = CloneCurrentElements();
+            int beforeSelectedIndex = _selectedElementIndex;
             var before = m_CurrShowElement[index].DeepCopy();
             m_CurrShowElement.RemoveAt(index);
 
@@ -330,6 +373,14 @@ namespace AvaloniaVisionControl
             RaiseSelectionChangedIfNeeded(previousSelected, _selectedElementIndex, PaintElementChangeSource.Api);
 
             InvalidateVisual();
+
+            RecordHistoryCommittedChange(
+                PaintElementChangeAction.Removed,
+                beforeElements,
+                beforeSelectedIndex,
+                CloneCurrentElements(),
+                _selectedElementIndex);
+
             return SuccessCode;
         }
 
@@ -340,6 +391,8 @@ namespace AvaloniaVisionControl
                 return SuccessCode;
             }
 
+            List<PaintElement> beforeElements = CloneCurrentElements();
+            int beforeSelectedIndex = _selectedElementIndex;
             int previousSelected = _selectedElementIndex;
             m_CurrShowElement.Clear();
             _selectedElementIndex = -1;
@@ -355,6 +408,14 @@ namespace AvaloniaVisionControl
             RaiseSelectionChangedIfNeeded(previousSelected, _selectedElementIndex, PaintElementChangeSource.Api);
 
             InvalidateVisual();
+
+            RecordHistoryCommittedChange(
+                PaintElementChangeAction.Cleared,
+                beforeElements,
+                beforeSelectedIndex,
+                CloneCurrentElements(),
+                _selectedElementIndex);
+
             return SuccessCode;
         }
 

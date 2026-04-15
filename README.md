@@ -212,6 +212,24 @@ var textRoi = new PaintElement
 
 `ImageControlHelper` 也支持快速设置：`CreateText(...)` 默认 `isEditable = false`。
 
+### 6.2 编辑快捷键
+
+当控件获得焦点且 `IsElementEditingEnabled = true` 时：
+
+- `Ctrl+Z`：撤销（Undo）
+- `Ctrl+Y`：重做（Redo）
+- `Ctrl+C`：复制当前选中图元（会话内）
+- `Ctrl+V`：粘贴图元副本（坐标固定偏移 `+10,+10`）
+- `Delete`：删除当前选中图元（若该图元 `IsEditable = true`）
+- `Escape`：
+  - 若当前正在拖动/缩放，取消本次交互并回滚
+  - 若当前没有活动交互但存在选中图元，则清空选择
+
+说明：
+
+- 复制/粘贴为当前控件实例内会话能力，不使用系统剪贴板。
+- `IsEditable = false` 的图元不可交互编辑与键盘删除。
+
 ## 7. 事件
 
 ### 7.1 `ImageClick`
@@ -262,7 +280,17 @@ imageControl.ElementChanged += (s, e) =>
 - `AddPaintElements(...)`（在现有图元基础上追加，不覆盖）
 - `ClearPaintElements(...)`
 
-## 10. 兼容接口说明
+## 10. 历史与剪贴板 API（CtlOnlyShowImage）
+
+- `CanUndo` / `CanRedo`
+- `MaxHistoryEntries`（默认 `100`）
+- `Undo()`
+- `Redo()`
+- `CopySelectedElement()`
+- `PasteCopiedElement()`
+- `HistoryStateChanged`（当 `CanUndo/CanRedo` 状态变化时触发）
+
+## 11. 兼容接口说明
 
 以下接口为兼容保留，在当前纯像素模式下不参与真实标定换算：
 
@@ -273,7 +301,7 @@ imageControl.ElementChanged += (s, e) =>
 - `SetUpdateCameraPos(Func<Point>)`
 - `ConvertImageToMachinePosition(Point)`（当前返回像素坐标并做边界裁剪）
 
-## 11. 常见问题
+## 12. 常见问题
 
 ### 图元设置后不显示
 
@@ -301,7 +329,7 @@ imageControl.ElementChanged += (s, e) =>
 - 若当前是用户放大状态，会保持放大比例并自动夹紧平移边界。
 - 双击会复位到当前窗口下的 fit 视图。
 
-## 12. 打包
+## 13. 打包
 
 ```bash
 dotnet pack -c Release

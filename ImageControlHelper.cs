@@ -43,7 +43,17 @@ namespace AvaloniaVisionControl
         /// </summary>
         public static PaintElement CreateCircle(
             double centerX, double centerY, double radius,
-            Color color, double lineWidth = 2.0, bool isFill = false, bool isEditable = true)
+            Color color, double lineWidth = 2.0, bool isFill = false)
+        {
+            return CreateCircle(centerX, centerY, radius, color, lineWidth, isFill, isEditable: true);
+        }
+
+        /// <summary>
+        /// 快速创建圆形图元（支持设置是否可编辑）
+        /// </summary>
+        public static PaintElement CreateCircle(
+            double centerX, double centerY, double radius,
+            Color color, double lineWidth, bool isFill, bool isEditable)
         {
             return new PaintElement
             {
@@ -62,7 +72,17 @@ namespace AvaloniaVisionControl
         /// </summary>
         public static PaintElement CreateLine(
             double x1, double y1, double x2, double y2,
-            Color color, double lineWidth = 2.0, bool isEditable = true)
+            Color color, double lineWidth = 2.0)
+        {
+            return CreateLine(x1, y1, x2, y2, color, lineWidth, isEditable: true);
+        }
+
+        /// <summary>
+        /// 快速创建线段图元（支持设置是否可编辑）
+        /// </summary>
+        public static PaintElement CreateLine(
+            double x1, double y1, double x2, double y2,
+            Color color, double lineWidth, bool isEditable)
         {
             return new PaintElement
             {
@@ -80,7 +100,17 @@ namespace AvaloniaVisionControl
         /// </summary>
         public static PaintElement CreateRectangle(
             double x1, double y1, double x2, double y2,
-            Color color, double lineWidth = 2.0, bool isFill = false, bool isEditable = true)
+            Color color, double lineWidth = 2.0, bool isFill = false)
+        {
+            return CreateRectangle(x1, y1, x2, y2, color, lineWidth, isFill, isEditable: true);
+        }
+
+        /// <summary>
+        /// 快速创建矩形图元（支持设置是否可编辑）
+        /// </summary>
+        public static PaintElement CreateRectangle(
+            double x1, double y1, double x2, double y2,
+            Color color, double lineWidth, bool isFill, bool isEditable)
         {
             return new PaintElement
             {
@@ -98,7 +128,16 @@ namespace AvaloniaVisionControl
         /// 快速创建十字图元
         /// </summary>
         public static PaintElement CreateCross(
-            double x, double y, Color color, double lineWidth = 2.0, bool isEditable = true)
+            double x, double y, Color color, double lineWidth = 2.0)
+        {
+            return CreateCross(x, y, color, lineWidth, isEditable: true);
+        }
+
+        /// <summary>
+        /// 快速创建十字图元（支持设置是否可编辑）
+        /// </summary>
+        public static PaintElement CreateCross(
+            double x, double y, Color color, double lineWidth, bool isEditable)
         {
             return new PaintElement
             {
@@ -115,7 +154,16 @@ namespace AvaloniaVisionControl
         /// 快速创建点图元
         /// </summary>
         public static PaintElement CreatePoint(
-            double x, double y, Color color, double size = 3.0, bool isEditable = true)
+            double x, double y, Color color, double size = 3.0)
+        {
+            return CreatePoint(x, y, color, size, isEditable: true);
+        }
+
+        /// <summary>
+        /// 快速创建点图元（支持设置是否可编辑）
+        /// </summary>
+        public static PaintElement CreatePoint(
+            double x, double y, Color color, double size, bool isEditable)
         {
             return new PaintElement
             {
@@ -132,7 +180,16 @@ namespace AvaloniaVisionControl
         /// 快速创建文本图元
         /// </summary>
         public static PaintElement CreateText(
-            double x, double y, string text, Color color, double fontSize = 12.0, bool isEditable = false)
+            double x, double y, string text, Color color, double fontSize = 12.0)
+        {
+            return CreateText(x, y, text, color, fontSize, isEditable: false);
+        }
+
+        /// <summary>
+        /// 快速创建文本图元（支持设置是否可编辑）
+        /// </summary>
+        public static PaintElement CreateText(
+            double x, double y, string text, Color color, double fontSize, bool isEditable)
         {
             return new PaintElement
             {
@@ -151,7 +208,17 @@ namespace AvaloniaVisionControl
         /// </summary>
         public static PaintElement CreateArrow(
             double x1, double y1, double x2, double y2,
-            Color color, double lineWidth = 2.0, bool isEditable = true)
+            Color color, double lineWidth = 2.0)
+        {
+            return CreateArrow(x1, y1, x2, y2, color, lineWidth, isEditable: true);
+        }
+
+        /// <summary>
+        /// 快速创建箭头图元（支持设置是否可编辑）
+        /// </summary>
+        public static PaintElement CreateArrow(
+            double x1, double y1, double x2, double y2,
+            Color color, double lineWidth, bool isEditable)
         {
             return new PaintElement
             {
