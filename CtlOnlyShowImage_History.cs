@@ -7,6 +7,7 @@ namespace AvaloniaVisionControl
     {
         private readonly struct SelectionState
         {
+            // 记录主选中元素索引以及完整的选中索引集合。
             public SelectionState(int primaryIndex, List<int> selectedIndexes)
             {
                 PrimaryIndex = primaryIndex;
@@ -60,6 +61,9 @@ namespace AvaloniaVisionControl
 
         public event EventHandler? HistoryStateChanged;
 
+        /// <summary>
+        /// 恢复到上一条已提交快照，并将当前状态转入重做历史。
+        /// </summary>
         public bool Undo()
         {
             if (!CanUndo)
@@ -74,6 +78,9 @@ namespace AvaloniaVisionControl
             return true;
         }
 
+        /// <summary>
+        /// 重新应用最近一次撤销的快照，并将其放回撤销历史。
+        /// </summary>
         public bool Redo()
         {
             if (!CanRedo)
@@ -88,6 +95,9 @@ namespace AvaloniaVisionControl
             return true;
         }
 
+        /// <summary>
+        /// 将当前选中的全部元素复制到内部剪贴板。
+        /// </summary>
         public bool CopySelectedElement()
         {
             List<int> selectedIndexes = GetOrderedSelectedElementIndexes();
@@ -105,6 +115,9 @@ namespace AvaloniaVisionControl
             return true;
         }
 
+        /// <summary>
+        /// 将剪贴板元素按小偏移量粘贴、更新选中状态，并记录一条历史。
+        /// </summary>
         public bool PasteCopiedElement()
         {
             if (_copiedElements == null || _copiedElements.Count == 0)
@@ -171,6 +184,8 @@ namespace AvaloniaVisionControl
             return true;
         }
 
+        // 将一次已提交的变更写入撤销历史，并清空重做历史。
+        // 在撤销/重做回放快照期间不记录历史。
         private void RecordHistoryCommittedChange(
             PaintElementChangeAction action,
             List<PaintElement> beforeElements,
@@ -201,11 +216,13 @@ namespace AvaloniaVisionControl
             RaiseHistoryStateChangedIfNeeded();
         }
 
+        // 克隆当前元素列表，避免历史快照被后续编辑影响。
         private List<PaintElement> CloneCurrentElements()
         {
             return DeepCloneElements(m_CurrShowElement);
         }
 
+        // 按原顺序深拷贝 source 中的所有元素。
         private static List<PaintElement> DeepCloneElements(IReadOnlyList<PaintElement> source)
         {
             var result = new List<PaintElement>(source.Count);
@@ -217,6 +234,7 @@ namespace AvaloniaVisionControl
             return result;
         }
 
+        // 定义哪些已提交动作需要生成撤销/重做历史项。
         private static bool ShouldRecordAction(PaintElementChangeAction action)
         {
             return action == PaintElementChangeAction.Added ||
@@ -226,6 +244,7 @@ namespace AvaloniaVisionControl
                 action == PaintElementChangeAction.Replaced;
         }
 
+        // 确保选中索引落在有效范围；-1 表示“无选中”。
         private static int NormalizeSelectedIndex(int index, int elementCount)
         {
             if (elementCount <= 0)
@@ -241,6 +260,7 @@ namespace AvaloniaVisionControl
             return index < elementCount ? index : elementCount - 1;
         }
 
+        // 按当前元素数量规范化选中状态，并去重索引。
         private static SelectionState NormalizeSelectionState(SelectionState state, int elementCount)
         {
             var normalizedIndexes = new List<int>();
@@ -266,6 +286,7 @@ namespace AvaloniaVisionControl
             return new SelectionState(primaryIndex, normalizedIndexes);
         }
 
+        // 对元素点位列表中的每组坐标应用平移偏移。
         private static void OffsetElementPoints(PaintElement element, double dx, double dy)
         {
             for (int i = 0; i + 1 < element.Pts.Count; i += 2)
@@ -275,11 +296,13 @@ namespace AvaloniaVisionControl
             }
         }
 
+        // 捕获当前选中状态，用于历史快照。
         private SelectionState CaptureSelectionState()
         {
             return new SelectionState(_selectedElementIndex, GetOrderedSelectedElementIndexes());
         }
 
+        // 从历史快照恢复当前元素与选中状态，并触发已提交变更通知。
         private void ApplyHistorySnapshot(List<PaintElement> elements, SelectionState selection)
         {
             int previousSelectedIndex = _selectedElementIndex;
@@ -315,6 +338,7 @@ namespace AvaloniaVisionControl
             }
         }
 
+        // 从栈式历史列表中弹出最新一条记录。
         private static HistoryEntry PopLast(List<HistoryEntry> stack)
         {
             int lastIndex = stack.Count - 1;
@@ -323,12 +347,14 @@ namespace AvaloniaVisionControl
             return result;
         }
 
+        // 压入一条历史记录，并按 MaxHistoryEntries 裁剪超出部分。
         private void PushHistory(List<HistoryEntry> stack, HistoryEntry entry)
         {
             stack.Add(entry);
             TrimHistoryToMax(stack);
         }
 
+        // 当历史数量超出上限时，移除最旧记录。
         private void TrimHistoryToMax(List<HistoryEntry> stack)
         {
             while (stack.Count > _maxHistoryEntries)
@@ -337,6 +363,7 @@ namespace AvaloniaVisionControl
             }
         }
 
+        // 仅在 CanUndo/CanRedo 状态发生变化时触发历史状态事件。
         private void RaiseHistoryStateChangedIfNeeded()
         {
             bool canUndo = CanUndo;

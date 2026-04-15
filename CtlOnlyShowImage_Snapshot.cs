@@ -8,13 +8,22 @@ using Avalonia.Media.Imaging;
 
 namespace AvaloniaVisionControl
 {
+    /// <summary>
+    /// CtlOnlyShowImage 的快照导出能力（partial class）。
+    /// </summary>
     public partial class CtlOnlyShowImage
     {
+        /// <summary>
+        /// 用于离屏渲染快照的内部画布。
+        /// </summary>
         private sealed class SnapshotRenderSurface : Control
         {
             private readonly Bitmap _image;
             private readonly IReadOnlyList<PaintElement> _elements;
 
+            /// <summary>
+            /// 初始化快照渲染画布，尺寸与源图像保持一致。
+            /// </summary>
             public SnapshotRenderSurface(Bitmap image, IReadOnlyList<PaintElement> elements)
             {
                 _image = image;
@@ -23,6 +32,9 @@ namespace AvaloniaVisionControl
                 Height = image.PixelSize.Height;
             }
 
+            /// <summary>
+            /// 渲染底图及可见图元到离屏上下文。
+            /// </summary>
             public override void Render(DrawingContext context)
             {
                 base.Render(context);
@@ -49,6 +61,10 @@ namespace AvaloniaVisionControl
             }
         }
 
+        /// <summary>
+        /// 将当前图像及可见图元导出到输出流。
+        /// </summary>
+        /// <returns>导出成功返回 true，否则返回 false。</returns>
         public bool ExportSnapshot(Stream outputStream)
         {
             if (outputStream == null || !outputStream.CanWrite || _originImage == null)
@@ -75,6 +91,10 @@ namespace AvaloniaVisionControl
             return true;
         }
 
+        /// <summary>
+        /// 将当前图像及可见图元导出到文件路径。
+        /// </summary>
+        /// <returns>导出成功返回 true，否则返回 false。</returns>
         public bool ExportSnapshot(string filePath)
         {
             if (string.IsNullOrWhiteSpace(filePath))

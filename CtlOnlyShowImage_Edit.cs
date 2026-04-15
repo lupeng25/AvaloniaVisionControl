@@ -8,8 +8,15 @@ using Avalonia.Media;
 
 namespace AvaloniaVisionControl
 {
+    /// <summary>
+    /// CtlOnlyShowImage 的图元交互编辑能力（partial class）。
+    /// 负责命中测试、拖拽缩放、框选、多选与交互态提交。
+    /// </summary>
     public partial class CtlOnlyShowImage
     {
+        /// <summary>
+        /// 编辑交互模式。
+        /// </summary>
         private enum EditInteractionMode
         {
             None,
@@ -20,6 +27,9 @@ namespace AvaloniaVisionControl
             PanningImage
         }
 
+        /// <summary>
+        /// 图元句柄类型。
+        /// </summary>
         private enum ElementHandleType
         {
             None,
@@ -38,6 +48,9 @@ namespace AvaloniaVisionControl
             PolygonVertex
         }
 
+        /// <summary>
+        /// 句柄命中结果：包含图元索引、句柄类型及可选顶点索引。
+        /// </summary>
         private readonly struct HandleHitResult
         {
             public HandleHitResult(int elementIndex, ElementHandleType handleType, int vertexIndex = -1)
@@ -54,6 +67,9 @@ namespace AvaloniaVisionControl
             public int VertexIndex { get; }
         }
 
+        /// <summary>
+        /// 可渲染/可命中的句柄点定义。
+        /// </summary>
         private readonly struct HandlePoint
         {
             public HandlePoint(ElementHandleType handleType, Point position, int vertexIndex = -1)
@@ -102,6 +118,7 @@ namespace AvaloniaVisionControl
         private static readonly IBrush SelectionBoxFillBrush = new SolidColorBrush(Color.FromArgb(50, 0, 120, 215));
         private static readonly IPen SelectionBoxBorderPen = new Pen(new SolidColorBrush(Color.FromArgb(255, 0, 120, 215)), 1);
 
+        // 处理左键按下：根据命中结果进入缩放、移动、框选或平移模式。
         private void HandlePointerPressed(PointerPressedEventArgs e)
         {
             var point = e.GetCurrentPoint(this);
@@ -223,6 +240,7 @@ namespace AvaloniaVisionControl
             e.Pointer.Capture(this);
         }
 
+        // 处理鼠标移动：驱动当前交互模式下的预览更新。
         private void HandlePointerMoved(PointerEventArgs e)
         {
             var mousePos = e.GetPosition(this);
@@ -289,6 +307,7 @@ namespace AvaloniaVisionControl
             }
         }
 
+        // 处理左键释放：提交当前交互并按需触发点击事件。
         private void HandlePointerReleased(PointerReleasedEventArgs e)
         {
             var point = e.GetCurrentPoint(this);
@@ -330,6 +349,7 @@ namespace AvaloniaVisionControl
             UpdateCursorStyle(mousePos);
         }
 
+        // 根据当前位置返回最合适的光标样式。
         private Cursor GetCursorForPosition(Point mousePosition)
         {
             if (_originImage == null)
@@ -384,6 +404,7 @@ namespace AvaloniaVisionControl
                 : Cursor.Default;
         }
 
+        // 根据句柄类型返回对应的拖拽/缩放光标。
         private Cursor GetCursorForHandle(ElementHandleType handleType)
         {
             return handleType switch
@@ -405,6 +426,7 @@ namespace AvaloniaVisionControl
             };
         }
 
+        // 命中测试当前选中图元的编辑句柄。
         private bool TryHitTestHandle(Point mousePosition, out HandleHitResult hitResult)
         {
             if (GetSelectedElementIndexes().Count != 1 ||
@@ -443,6 +465,7 @@ namespace AvaloniaVisionControl
             return false;
         }
 
+        // 命中测试图元主体，按显示顺序从上层向下层查找。
         private bool TryHitTestElementBody(Point mousePosition, out int elementIndex)
         {
             for (int i = m_CurrShowElement.Count - 1; i >= 0; i--)
@@ -544,6 +567,7 @@ namespace AvaloniaVisionControl
             return false;
         }
 
+        // 移动当前活动图元（单选拖拽）。
         private bool TryMoveActiveElement(double deltaControlX, double deltaControlY)
         {
             if (_activeElementIndex < 0 || _activeElementIndex >= m_CurrShowElement.Count)
@@ -620,6 +644,7 @@ namespace AvaloniaVisionControl
             };
         }
 
+        // 移动多选图元，整体位移并限制在图像范围内。
         private bool TryMoveSelectedElements(double deltaControlX, double deltaControlY)
         {
             List<int> selectedIndexes = GetOrderedSelectedElementIndexes();
@@ -680,6 +705,7 @@ namespace AvaloniaVisionControl
             return true;
         }
 
+        // 按句柄类型缩放当前活动图元。
         private bool TryResizeActiveElement(Point mousePosition, double deltaControlX, double deltaControlY)
         {
             if (_activeElementIndex < 0 || _activeElementIndex >= m_CurrShowElement.Count)
@@ -1461,9 +1487,10 @@ namespace AvaloniaVisionControl
                 };
         }
 
+        // 获取像素到机台坐标的变换矩阵；纯图像模式下返回单位矩阵。
         private bool TryGetPixelToMachineMatrix(out double[] pixelToMachineMatrix)
         {
-            // Pure image mode: element points are already in image pixels.
+            // 纯图像模式下，图元点位已经是图像像素坐标。
             pixelToMachineMatrix = new double[9] { 1, 0, 0, 0, 1, 0, 0, 0, 1 };
             return true;
         }
@@ -1543,6 +1570,7 @@ namespace AvaloniaVisionControl
             return Math.Sqrt(dx * dx + dy * dy);
         }
 
+        // 绘制当前单选图元的编辑句柄。
         private void DrawElementEditHandles(DrawingContext context)
         {
             if (_originImage == null || CtlShowPaintStatus <= 0 || m_CurrShowElement.Count == 0 || !IsElementEditingEnabled)
@@ -1578,6 +1606,7 @@ namespace AvaloniaVisionControl
             }
         }
 
+        // 绘制框选矩形预览。
         private void DrawSelectionBox(DrawingContext context)
         {
             if (_interactionMode != EditInteractionMode.SelectingElements)
@@ -1594,6 +1623,7 @@ namespace AvaloniaVisionControl
             context.DrawRectangle(SelectionBoxFillBrush, SelectionBoxBorderPen, selectionRect);
         }
 
+        // 清理一次交互会话的临时状态。
         private void ResetInteractionState()
         {
             _interactionMode = EditInteractionMode.None;
@@ -1612,6 +1642,7 @@ namespace AvaloniaVisionControl
             CtlMouseStatus = ImageCtlMouseStatus.Normal;
         }
 
+        // 取消当前交互并回滚到交互起始快照。
         private bool TryCancelCurrentInteraction()
         {
             if (_interactionMode == EditInteractionMode.MovingElement ||
@@ -1639,6 +1670,7 @@ namespace AvaloniaVisionControl
             return false;
         }
 
+        // 提交多选移动，生成一次集合级变更与历史记录。
         private void CommitSelectionMove()
         {
             if (_interactionInitialElementsSnapshot == null || !_interactionInitialSelectionState.HasValue)
@@ -1667,6 +1699,7 @@ namespace AvaloniaVisionControl
                 CaptureSelectionState());
         }
 
+        // 提交框选结果，支持替换选中或追加选中。
         private void CommitSelectionBox()
         {
             Rect selectionRect = NormalizeRect(_selectionBoxStartPoint, _selectionBoxCurrentPoint);
@@ -2013,6 +2046,7 @@ namespace AvaloniaVisionControl
             }
         }
 
+        // 在拖拽/缩放过程中触发预览态元素变更事件。
         private void RaiseInteractionPreviewChanged()
         {
             if (_interactionMode != EditInteractionMode.MovingElement &&
@@ -2050,6 +2084,7 @@ namespace AvaloniaVisionControl
             _interactionElementChanged = true;
         }
 
+        // 在交互结束时触发提交态元素变更并写入历史。
         private void RaiseInteractionCommittedChanged()
         {
             if (_interactionMode == EditInteractionMode.MovingSelection)
