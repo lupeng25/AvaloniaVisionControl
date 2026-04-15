@@ -5,17 +5,30 @@ namespace AvaloniaVisionControl
 {
     public partial class CtlOnlyShowImage
     {
+        private readonly struct SelectionState
+        {
+            public SelectionState(int primaryIndex, List<int> selectedIndexes)
+            {
+                PrimaryIndex = primaryIndex;
+                SelectedIndexes = selectedIndexes;
+            }
+
+            public int PrimaryIndex { get; }
+
+            public List<int> SelectedIndexes { get; }
+        }
+
         private sealed class HistoryEntry
         {
             public required List<PaintElement> BeforeElements { get; init; }
             public required List<PaintElement> AfterElements { get; init; }
-            public required int BeforeSelectedIndex { get; init; }
-            public required int AfterSelectedIndex { get; init; }
+            public required SelectionState BeforeSelection { get; init; }
+            public required SelectionState AfterSelection { get; init; }
         }
 
         private readonly List<HistoryEntry> _undoHistory = new List<HistoryEntry>();
         private readonly List<HistoryEntry> _redoHistory = new List<HistoryEntry>();
-        private PaintElement? _copiedElement;
+        private List<PaintElement>? _copiedElements;
         private bool _isApplyingHistory;
         private int _maxHistoryEntries = 100;
         private bool _lastCanUndo;
@@ -55,7 +68,7 @@ namespace AvaloniaVisionControl
             }
 
             HistoryEntry entry = PopLast(_undoHistory);
-            ApplyHistorySnapshot(entry.BeforeElements, entry.BeforeSelectedIndex);
+            ApplyHistorySnapshot(entry.BeforeElements, entry.BeforeSelection);
             PushHistory(_redoHistory, entry);
             RaiseHistoryStateChangedIfNeeded();
             return true;
@@ -69,7 +82,7 @@ namespace AvaloniaVisionControl
             }
 
             HistoryEntry entry = PopLast(_redoHistory);
-            ApplyHistorySnapshot(entry.AfterElements, entry.AfterSelectedIndex);
+            ApplyHistorySnapshot(entry.AfterElements, entry.AfterSelection);
             PushHistory(_undoHistory, entry);
             RaiseHistoryStateChangedIfNeeded();
             return true;
@@ -77,44 +90,69 @@ namespace AvaloniaVisionControl
 
         public bool CopySelectedElement()
         {
-            if (!IsIndexValid(_selectedElementIndex))
+            List<int> selectedIndexes = GetOrderedSelectedElementIndexes();
+            if (selectedIndexes.Count == 0)
             {
                 return false;
             }
 
-            _copiedElement = m_CurrShowElement[_selectedElementIndex].DeepCopy();
+            _copiedElements = new List<PaintElement>(selectedIndexes.Count);
+            foreach (int index in selectedIndexes)
+            {
+                _copiedElements.Add(m_CurrShowElement[index].DeepCopy());
+            }
+
             return true;
         }
 
         public bool PasteCopiedElement()
         {
-            if (_copiedElement == null)
+            if (_copiedElements == null || _copiedElements.Count == 0)
             {
                 return false;
             }
 
-            PaintElement pasted = _copiedElement.DeepCopy();
-            OffsetElementPoints(pasted, PasteOffsetPixels, PasteOffsetPixels);
-            if (!IsValidElement(pasted))
+            var pastedElements = new List<PaintElement>(_copiedElements.Count);
+            foreach (PaintElement copied in _copiedElements)
             {
-                return false;
+                PaintElement pasted = copied.DeepCopy();
+                OffsetElementPoints(pasted, PasteOffsetPixels, PasteOffsetPixels);
+                if (!IsValidElement(pasted))
+                {
+                    return false;
+                }
+
+                pastedElements.Add(pasted);
             }
 
             List<PaintElement> beforeElements = CloneCurrentElements();
-            int beforeSelectedIndex = _selectedElementIndex;
+            SelectionState beforeSelection = CaptureSelectionState();
 
-            m_CurrShowElement.Add(pasted);
-            int insertedIndex = m_CurrShowElement.Count - 1;
+            int firstInsertedIndex = m_CurrShowElement.Count;
+            foreach (PaintElement pasted in pastedElements)
+            {
+                m_CurrShowElement.Add(pasted);
+            }
+
             int previousSelectedIndex = _selectedElementIndex;
-            _selectedElementIndex = insertedIndex;
+            _selectedElementIndexes.Clear();
+            for (int i = 0; i < pastedElements.Count; i++)
+            {
+                _selectedElementIndexes.Add(firstInsertedIndex + i);
+            }
+            _selectedElementIndex = firstInsertedIndex + pastedElements.Count - 1;
 
-            RaiseElementChanged(
-                PaintElementChangeAction.Added,
-                insertedIndex,
-                null,
-                pasted,
-                PaintElementChangeSource.Api,
-                PaintElementChangePhase.Committed);
+            for (int i = 0; i < pastedElements.Count; i++)
+            {
+                int insertedIndex = firstInsertedIndex + i;
+                RaiseElementChanged(
+                    PaintElementChangeAction.Added,
+                    insertedIndex,
+                    null,
+                    pastedElements[i],
+                    PaintElementChangeSource.Api,
+                    PaintElementChangePhase.Committed);
+            }
 
             RaiseSelectionChangedIfNeeded(
                 previousSelectedIndex,
@@ -126,9 +164,9 @@ namespace AvaloniaVisionControl
             RecordHistoryCommittedChange(
                 PaintElementChangeAction.Added,
                 beforeElements,
-                beforeSelectedIndex,
+                beforeSelection,
                 CloneCurrentElements(),
-                _selectedElementIndex);
+                CaptureSelectionState());
 
             return true;
         }
@@ -136,9 +174,9 @@ namespace AvaloniaVisionControl
         private void RecordHistoryCommittedChange(
             PaintElementChangeAction action,
             List<PaintElement> beforeElements,
-            int beforeSelectedIndex,
+            SelectionState beforeSelection,
             List<PaintElement> afterElements,
-            int afterSelectedIndex)
+            SelectionState afterSelection)
         {
             if (_isApplyingHistory)
             {
@@ -154,8 +192,8 @@ namespace AvaloniaVisionControl
             {
                 BeforeElements = DeepCloneElements(beforeElements),
                 AfterElements = DeepCloneElements(afterElements),
-                BeforeSelectedIndex = NormalizeSelectedIndex(beforeSelectedIndex, beforeElements.Count),
-                AfterSelectedIndex = NormalizeSelectedIndex(afterSelectedIndex, afterElements.Count)
+                BeforeSelection = NormalizeSelectionState(beforeSelection, beforeElements.Count),
+                AfterSelection = NormalizeSelectionState(afterSelection, afterElements.Count)
             };
 
             PushHistory(_undoHistory, entry);
@@ -203,6 +241,31 @@ namespace AvaloniaVisionControl
             return index < elementCount ? index : elementCount - 1;
         }
 
+        private static SelectionState NormalizeSelectionState(SelectionState state, int elementCount)
+        {
+            var normalizedIndexes = new List<int>();
+            if (elementCount > 0)
+            {
+                foreach (int index in state.SelectedIndexes)
+                {
+                    if (index >= 0 && index < elementCount && !normalizedIndexes.Contains(index))
+                    {
+                        normalizedIndexes.Add(index);
+                    }
+                }
+            }
+
+            normalizedIndexes.Sort();
+            int primaryIndex = NormalizeSelectedIndex(state.PrimaryIndex, elementCount);
+            if (primaryIndex >= 0 && !normalizedIndexes.Contains(primaryIndex))
+            {
+                normalizedIndexes.Add(primaryIndex);
+                normalizedIndexes.Sort();
+            }
+
+            return new SelectionState(primaryIndex, normalizedIndexes);
+        }
+
         private static void OffsetElementPoints(PaintElement element, double dx, double dy)
         {
             for (int i = 0; i + 1 < element.Pts.Count; i += 2)
@@ -212,7 +275,12 @@ namespace AvaloniaVisionControl
             }
         }
 
-        private void ApplyHistorySnapshot(List<PaintElement> elements, int selectedIndex)
+        private SelectionState CaptureSelectionState()
+        {
+            return new SelectionState(_selectedElementIndex, GetOrderedSelectedElementIndexes());
+        }
+
+        private void ApplyHistorySnapshot(List<PaintElement> elements, SelectionState selection)
         {
             int previousSelectedIndex = _selectedElementIndex;
 
@@ -220,7 +288,10 @@ namespace AvaloniaVisionControl
             try
             {
                 m_CurrShowElement = DeepCloneElements(elements);
-                _selectedElementIndex = NormalizeSelectedIndex(selectedIndex, m_CurrShowElement.Count);
+                SelectionState normalizedSelection = NormalizeSelectionState(selection, m_CurrShowElement.Count);
+                ReplaceSelectedIndexesInternal(
+                    normalizedSelection.SelectedIndexes,
+                    normalizedSelection.PrimaryIndex);
                 ResetInteractionState();
 
                 RaiseElementChanged(

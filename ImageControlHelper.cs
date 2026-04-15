@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.IO;
 using Avalonia;
 using Avalonia.Media;
 using Avalonia.Media.Imaging;
@@ -298,6 +299,32 @@ namespace AvaloniaVisionControl
         {
             control.SetPaintElements(new List<PaintElement>());
             control.ReFresh();
+        }
+
+        /// <summary>
+        /// 导出当前图像与可见图元叠加快照到文件。
+        /// </summary>
+        public static bool ExportSnapshotToFile(CtlOnlyShowImage control, string filePath)
+        {
+            if (control == null || string.IsNullOrWhiteSpace(filePath))
+            {
+                return false;
+            }
+
+            return control.ExportSnapshot(filePath);
+        }
+
+        /// <summary>
+        /// 导出当前图像与可见图元叠加快照到流。
+        /// </summary>
+        public static bool ExportSnapshotToStream(CtlOnlyShowImage control, Stream outputStream)
+        {
+            if (control == null || outputStream == null)
+            {
+                return false;
+            }
+
+            return control.ExportSnapshot(outputStream);
         }
 
         /// <summary>

@@ -26,6 +26,7 @@ namespace AvaloniaVisionControl
         private double m_lineWidthScale = 1;
 
         private int _selectedElementIndex = -1;
+        private readonly HashSet<int> _selectedElementIndexes = new HashSet<int>();
 
         private const int SuccessCode = 0;
         private const int InvalidParameterCode = -1;
@@ -74,7 +75,7 @@ namespace AvaloniaVisionControl
             {
                 ImageElementCtlStatus.None => false,
                 ImageElementCtlStatus.ShowAll => true,
-                ImageElementCtlStatus.ShowSelected => index == _selectedElementIndex,
+                ImageElementCtlStatus.ShowSelected => IsElementSelected(index),
                 _ => CtlShowPaintStatus > 0
             };
         }
@@ -181,7 +182,7 @@ namespace AvaloniaVisionControl
             }
 
             List<PaintElement> beforeElements = CloneCurrentElements();
-            int beforeSelectedIndex = _selectedElementIndex;
+            SelectionState beforeSelection = CaptureSelectionState();
 
             var newElements = new List<PaintElement>(needShowElement.Count);
             foreach (var element in needShowElement)
@@ -196,10 +197,7 @@ namespace AvaloniaVisionControl
 
             int previousSelected = _selectedElementIndex;
             m_CurrShowElement = newElements;
-            if (_selectedElementIndex >= m_CurrShowElement.Count)
-            {
-                _selectedElementIndex = -1;
-            }
+            ReplaceSelectedIndexesInternal(GetOrderedSelectedElementIndexes(), _selectedElementIndex);
 
             RaiseElementChanged(
                 PaintElementChangeAction.Replaced,
@@ -219,9 +217,9 @@ namespace AvaloniaVisionControl
             RecordHistoryCommittedChange(
                 PaintElementChangeAction.Replaced,
                 beforeElements,
-                beforeSelectedIndex,
+                beforeSelection,
                 CloneCurrentElements(),
-                _selectedElementIndex);
+                CaptureSelectionState());
 
             return SuccessCode;
         }
@@ -242,7 +240,7 @@ namespace AvaloniaVisionControl
             }
 
             List<PaintElement> beforeElements = CloneCurrentElements();
-            int beforeSelectedIndex = _selectedElementIndex;
+            SelectionState beforeSelection = CaptureSelectionState();
             var before = m_CurrShowElement[index].DeepCopy();
             m_CurrShowElement[index] = clone!;
 
@@ -259,9 +257,9 @@ namespace AvaloniaVisionControl
             RecordHistoryCommittedChange(
                 PaintElementChangeAction.Updated,
                 beforeElements,
-                beforeSelectedIndex,
+                beforeSelection,
                 CloneCurrentElements(),
-                _selectedElementIndex);
+                CaptureSelectionState());
 
             return SuccessCode;
         }
@@ -274,7 +272,7 @@ namespace AvaloniaVisionControl
             }
 
             List<PaintElement> beforeElements = CloneCurrentElements();
-            int beforeSelectedIndex = _selectedElementIndex;
+            SelectionState beforeSelection = CaptureSelectionState();
             m_CurrShowElement.Add(clone!);
             int index = m_CurrShowElement.Count - 1;
             RaiseElementChanged(
@@ -290,9 +288,9 @@ namespace AvaloniaVisionControl
             RecordHistoryCommittedChange(
                 PaintElementChangeAction.Added,
                 beforeElements,
-                beforeSelectedIndex,
+                beforeSelection,
                 CloneCurrentElements(),
-                _selectedElementIndex);
+                CaptureSelectionState());
 
             return SuccessCode;
         }
@@ -310,13 +308,14 @@ namespace AvaloniaVisionControl
             }
 
             List<PaintElement> beforeElements = CloneCurrentElements();
-            int beforeSelectedIndex = _selectedElementIndex;
+            SelectionState beforeSelection = CaptureSelectionState();
             m_CurrShowElement.Insert(index, clone!);
             int previousSelected = _selectedElementIndex;
             if (_selectedElementIndex >= index)
             {
                 _selectedElementIndex++;
             }
+            ShiftSelectedIndexesForInsert(index);
 
             RaiseElementChanged(
                 PaintElementChangeAction.Added,
@@ -333,9 +332,9 @@ namespace AvaloniaVisionControl
             RecordHistoryCommittedChange(
                 PaintElementChangeAction.Added,
                 beforeElements,
-                beforeSelectedIndex,
+                beforeSelection,
                 CloneCurrentElements(),
-                _selectedElementIndex);
+                CaptureSelectionState());
 
             return SuccessCode;
         }
@@ -348,7 +347,7 @@ namespace AvaloniaVisionControl
             }
 
             List<PaintElement> beforeElements = CloneCurrentElements();
-            int beforeSelectedIndex = _selectedElementIndex;
+            SelectionState beforeSelection = CaptureSelectionState();
             var before = m_CurrShowElement[index].DeepCopy();
             m_CurrShowElement.RemoveAt(index);
 
@@ -361,6 +360,7 @@ namespace AvaloniaVisionControl
             {
                 _selectedElementIndex--;
             }
+            ShiftSelectedIndexesForRemove(index);
 
             RaiseElementChanged(
                 PaintElementChangeAction.Removed,
@@ -377,9 +377,9 @@ namespace AvaloniaVisionControl
             RecordHistoryCommittedChange(
                 PaintElementChangeAction.Removed,
                 beforeElements,
-                beforeSelectedIndex,
+                beforeSelection,
                 CloneCurrentElements(),
-                _selectedElementIndex);
+                CaptureSelectionState());
 
             return SuccessCode;
         }
@@ -392,10 +392,11 @@ namespace AvaloniaVisionControl
             }
 
             List<PaintElement> beforeElements = CloneCurrentElements();
-            int beforeSelectedIndex = _selectedElementIndex;
+            SelectionState beforeSelection = CaptureSelectionState();
             int previousSelected = _selectedElementIndex;
             m_CurrShowElement.Clear();
             _selectedElementIndex = -1;
+            _selectedElementIndexes.Clear();
 
             RaiseElementChanged(
                 PaintElementChangeAction.Cleared,
@@ -412,9 +413,9 @@ namespace AvaloniaVisionControl
             RecordHistoryCommittedChange(
                 PaintElementChangeAction.Cleared,
                 beforeElements,
-                beforeSelectedIndex,
+                beforeSelection,
                 CloneCurrentElements(),
-                _selectedElementIndex);
+                CaptureSelectionState());
 
             return SuccessCode;
         }
@@ -448,7 +449,7 @@ namespace AvaloniaVisionControl
             }
 
             int previousSelected = _selectedElementIndex;
-            _selectedElementIndex = index;
+            ReplaceSelectedIndexesInternal(index >= 0 ? new[] { index } : Array.Empty<int>(), index);
             RaiseSelectionChangedIfNeeded(previousSelected, _selectedElementIndex, PaintElementChangeSource.Api);
             InvalidateVisual();
             return SuccessCode;
@@ -457,6 +458,11 @@ namespace AvaloniaVisionControl
         public int GetSelectedElementIndex()
         {
             return _selectedElementIndex;
+        }
+
+        public IReadOnlyList<int> GetSelectedElementIndexes()
+        {
+            return GetOrderedSelectedElementIndexes();
         }
 
         /// <summary>
@@ -475,9 +481,159 @@ namespace AvaloniaVisionControl
             }
 
             int previousSelected = _selectedElementIndex;
-            _selectedElementIndex = index;
+            ReplaceSelectedIndexesInternal(index >= 0 ? new[] { index } : Array.Empty<int>(), index);
             RaiseSelectionChangedIfNeeded(previousSelected, _selectedElementIndex, source);
             return previousSelected != _selectedElementIndex;
+        }
+
+        private bool IsElementSelected(int index)
+        {
+            return index >= 0 && _selectedElementIndexes.Contains(index);
+        }
+
+        private void ReplaceSelectedIndexesInternal(IEnumerable<int> selectedIndexes, int primaryIndex)
+        {
+            _selectedElementIndexes.Clear();
+            foreach (int index in selectedIndexes)
+            {
+                if (IsIndexValid(index))
+                {
+                    _selectedElementIndexes.Add(index);
+                }
+            }
+
+            _selectedElementIndex = IsIndexValid(primaryIndex) ? primaryIndex : -1;
+            if (_selectedElementIndex >= 0 && !_selectedElementIndexes.Contains(_selectedElementIndex))
+            {
+                _selectedElementIndexes.Add(_selectedElementIndex);
+            }
+
+            if (_selectedElementIndex < 0 && _selectedElementIndexes.Count > 0)
+            {
+                _selectedElementIndex = GetOrderedSelectedElementIndexes()[^1];
+            }
+        }
+
+        private void ToggleSelectedIndexInternal(int index)
+        {
+            if (!IsIndexValid(index))
+            {
+                return;
+            }
+
+            if (_selectedElementIndexes.Contains(index))
+            {
+                _selectedElementIndexes.Remove(index);
+                if (_selectedElementIndex == index)
+                {
+                    _selectedElementIndex = _selectedElementIndexes.Count > 0
+                        ? GetOrderedSelectedElementIndexes()[^1]
+                        : -1;
+                }
+            }
+            else
+            {
+                _selectedElementIndexes.Add(index);
+                _selectedElementIndex = index;
+            }
+        }
+
+        private List<int> GetOrderedSelectedElementIndexes()
+        {
+            var result = new List<int>(_selectedElementIndexes);
+            result.Sort();
+            return result;
+        }
+
+        private void ShiftSelectedIndexesForInsert(int index)
+        {
+            if (_selectedElementIndexes.Count == 0)
+            {
+                return;
+            }
+
+            var shifted = new List<int>(_selectedElementIndexes.Count);
+            foreach (int selectedIndex in _selectedElementIndexes)
+            {
+                shifted.Add(selectedIndex >= index ? selectedIndex + 1 : selectedIndex);
+            }
+
+            ReplaceSelectedIndexesInternal(shifted, _selectedElementIndex);
+        }
+
+        private void ShiftSelectedIndexesForRemove(int index)
+        {
+            if (_selectedElementIndexes.Count == 0)
+            {
+                return;
+            }
+
+            var shifted = new List<int>(_selectedElementIndexes.Count);
+            foreach (int selectedIndex in _selectedElementIndexes)
+            {
+                if (selectedIndex == index)
+                {
+                    continue;
+                }
+
+                shifted.Add(selectedIndex > index ? selectedIndex - 1 : selectedIndex);
+            }
+
+            ReplaceSelectedIndexesInternal(shifted, _selectedElementIndex);
+        }
+
+        private bool DeleteSelectedElements()
+        {
+            List<int> selectedIndexes = GetOrderedSelectedElementIndexes();
+            if (selectedIndexes.Count == 0)
+            {
+                return false;
+            }
+
+            var removableIndexes = new List<int>();
+            foreach (int selectedIndex in selectedIndexes)
+            {
+                if (IsIndexValid(selectedIndex) && m_CurrShowElement[selectedIndex].IsEditable)
+                {
+                    removableIndexes.Add(selectedIndex);
+                }
+            }
+
+            if (removableIndexes.Count == 0)
+            {
+                return false;
+            }
+
+            List<PaintElement> beforeElements = CloneCurrentElements();
+            SelectionState beforeSelection = CaptureSelectionState();
+
+            removableIndexes.Sort();
+            for (int i = removableIndexes.Count - 1; i >= 0; i--)
+            {
+                int removeIndex = removableIndexes[i];
+                PaintElement before = m_CurrShowElement[removeIndex].DeepCopy();
+                m_CurrShowElement.RemoveAt(removeIndex);
+                RaiseElementChanged(
+                    PaintElementChangeAction.Removed,
+                    removeIndex,
+                    before,
+                    null,
+                    PaintElementChangeSource.Api,
+                    PaintElementChangePhase.Committed);
+            }
+
+            ReplaceSelectedIndexesInternal(Array.Empty<int>(), -1);
+            RaiseSelectionChangedIfNeeded(beforeSelection.PrimaryIndex, _selectedElementIndex, PaintElementChangeSource.Api);
+            InvalidateVisual();
+
+            RecordHistoryCommittedChange(
+                PaintElementChangeAction.Removed,
+                beforeElements,
+                beforeSelection,
+                CloneCurrentElements(),
+                CaptureSelectionState());
+
+            return true;
         }
 
         private void RaiseSelectionChangedIfNeeded(int beforeIndex, int afterIndex, PaintElementChangeSource source)

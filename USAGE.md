@@ -212,6 +212,21 @@ new PaintElement
 - 复制/粘贴范围为当前控件实例会话，不走系统剪贴板。
 - `IsEditable = false` 的图元不会被交互编辑或键盘删除。
 
+### 5.5 多选与框选
+
+当前支持：
+
+- `Ctrl + 单击图元`：追加/取消单个图元选择
+- `Shift + 在空白区域拖拽`：框选图元
+- `Ctrl + Shift + 在空白区域拖拽`：追加框选
+- 多选后，拖动任一已选图元可整体移动
+
+说明：
+
+- 批量移动只对已选图元生效
+- 句柄缩放仅在单选时可用
+- `GetSelectedElementIndexes()` 可获取当前所有选中索引
+
 ## 6. 事件与回调
 
 ### 6.1 图像点击事件
@@ -272,6 +287,27 @@ imageControl.HistoryStateChanged += (s, e) =>
 };
 ```
 
+### 6.5 快照导出
+
+```csharp
+bool ok = imageControl.ExportSnapshot(@"D:\temp\vision-snapshot.png");
+```
+
+或：
+
+```csharp
+using var stream = File.Create(@"D:\temp\vision-snapshot.png");
+bool ok = imageControl.ExportSnapshot(stream);
+```
+
+辅助类也提供快捷入口：
+
+```csharp
+bool ok = ImageControlHelper.ExportSnapshotToFile(imageControl, @"D:\temp\vision-snapshot.png");
+```
+
+导出内容为“原图 + 当前可见 ROI 叠加”，不包含编辑句柄和框选矩形。
+
 ## 7. 常用 API 清单
 
 - 图像：
@@ -298,6 +334,9 @@ imageControl.HistoryStateChanged += (s, e) =>
   - `Redo()`
   - `CopySelectedElement()`
   - `PasteCopiedElement()`
+  - `GetSelectedElementIndexes()`
+  - `ExportSnapshot(Stream)`
+  - `ExportSnapshot(string)`
 - 交互：
   - `IsElementEditingEnabled`（属性）
 

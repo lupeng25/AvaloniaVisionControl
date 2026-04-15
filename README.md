@@ -230,6 +230,20 @@ var textRoi = new PaintElement
 - 复制/粘贴为当前控件实例内会话能力，不使用系统剪贴板。
 - `IsEditable = false` 的图元不可交互编辑与键盘删除。
 
+### 6.3 多选与框选
+
+当前支持单控件内多选与框选：
+
+- `Ctrl + 单击图元`：追加/取消选择
+- `Shift + 空白区域拖拽`：框选图元
+- `Ctrl + Shift + 空白区域拖拽`：在现有选择基础上追加框选
+- 多选后，拖动任一已选图元可整体移动选中集合
+
+说明：
+
+- 句柄缩放仅在“单选”时启用。
+- `CtlShowPaintStatus = ShowSelected` 时，会显示全部已选图元。
+
 ## 7. 事件
 
 ### 7.1 `ImageClick`
@@ -289,8 +303,18 @@ imageControl.ElementChanged += (s, e) =>
 - `CopySelectedElement()`
 - `PasteCopiedElement()`
 - `HistoryStateChanged`（当 `CanUndo/CanRedo` 状态变化时触发）
+- `GetSelectedElementIndexes()`
 
-## 11. 兼容接口说明
+## 11. 快照导出 API
+
+- `ExportSnapshot(Stream outputStream)`
+- `ExportSnapshot(string filePath)`
+- `ImageControlHelper.ExportSnapshotToStream(...)`
+- `ImageControlHelper.ExportSnapshotToFile(...)`
+
+导出内容为“原图 + 当前可见 ROI 叠加”，不包含编辑句柄与选择框。
+
+## 12. 兼容接口说明
 
 以下接口为兼容保留，在当前纯像素模式下不参与真实标定换算：
 
@@ -301,7 +325,7 @@ imageControl.ElementChanged += (s, e) =>
 - `SetUpdateCameraPos(Func<Point>)`
 - `ConvertImageToMachinePosition(Point)`（当前返回像素坐标并做边界裁剪）
 
-## 12. 常见问题
+## 13. 常见问题
 
 ### 图元设置后不显示
 
@@ -321,6 +345,14 @@ imageControl.ElementChanged += (s, e) =>
 - `NeedShowCam` 包含当前 `CamID`
 - 图像输入返回码为 `0`
 
+### 快照导出为空或失败
+
+请确认：
+
+- 当前控件已成功显示图像
+- 输出流可写，或目标文件路径可创建
+- 导出时控件未被释放
+
 ### 窗口 resize 后显示异常
 
 当前版本在控件尺寸变化时会自动更新视口状态：
@@ -329,7 +361,7 @@ imageControl.ElementChanged += (s, e) =>
 - 若当前是用户放大状态，会保持放大比例并自动夹紧平移边界。
 - 双击会复位到当前窗口下的 fit 视图。
 
-## 13. 打包
+## 14. 打包
 
 ```bash
 dotnet pack -c Release

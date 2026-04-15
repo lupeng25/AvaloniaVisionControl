@@ -269,10 +269,8 @@ namespace AvaloniaVisionControl
 
             if (e.Key == Key.Delete)
             {
-                if (IsIndexValid(_selectedElementIndex) &&
-                    m_CurrShowElement[_selectedElementIndex].IsEditable)
+                if (DeleteSelectedElements())
                 {
-                    RemovePaintElementAt(_selectedElementIndex);
                     e.Handled = true;
                 }
 
@@ -381,7 +379,7 @@ namespace AvaloniaVisionControl
                     if (newPt.Count > 0)
                     {
                         element.Paint(context, m_lineWidthScale * _currentZoomFactor, newPt);
-                        if (i == _selectedElementIndex)
+                        if (IsElementSelected(i))
                         {
                             DrawSelectedElementAdornment(context, element, newPt);
                         }
@@ -390,6 +388,8 @@ namespace AvaloniaVisionControl
 
                 DrawElementEditHandles(context);
             }
+
+            DrawSelectionBox(context);
         }
 
         /// <summary>
